@@ -134,5 +134,15 @@ dmypy.json
 # pytype static type analyzer
 .pytype/
 
+# usefull
+.work
+.notebooks
+
 # Cython debug symbols
 cython_debug/
+
+# PDM
+.pdm-python
+
+# setuptools-scm version files
+_version.*
