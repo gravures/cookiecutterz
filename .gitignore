@@ -145,4 +145,4 @@ cython_debug/
 .pdm-python
 
 # setuptools-scm version files
-_version.*
+_version.py
