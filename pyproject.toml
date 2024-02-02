@@ -31,6 +31,9 @@ source   = "https://github.com/gravures/cookiecutterz"
 [project.scripts]
 cookiecutter = "cookiecutterz.main:main"
 
+[project.optional-dependencies]
+cruft = ["cruft"]
+
 [tool.setuptools]
 platforms = ["Windows", "macOS", "Linux"]
 
