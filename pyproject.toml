@@ -9,10 +9,7 @@ authors = [{ name = "Gilles Coissac", email = "gilles@ideographe.fr" }]
 readme = "README.md"
 license = { text = "GPL-3.0" }
 requires-python = ">=3.8"
-dependencies = [
-    "cookiecutter>=2.3.0",
-    "cruft>=2.15.0",
-]
+dependencies = ["cookiecutter>=2.3.0", "cruft>=2.15.0"]
 keywords = ['cookiecutter', 'template', 'template-engine']
 classifiers = [
   "Intended Audience :: Developers",
@@ -33,7 +30,7 @@ source   = "https://github.com/gravures/cookiecutterz"
 
 [project.scripts]
 cookiecutter = "cookiecutterz.main:main"
-cruft        = "cruft._cli:app"
+cruft        = "cookiecutterz.cruft:main"
 
 [tool.setuptools]
 platforms = ["Windows", "macOS", "Linux"]
