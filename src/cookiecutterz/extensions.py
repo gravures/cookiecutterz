@@ -3,7 +3,6 @@
 """Extensions module for cookiecutter."""
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -27,24 +26,6 @@ class UpdateException(CookiecutterException):
 def get_public_keys(context: dict) -> dict:
     """Filter out private keys from a context."""
     return {k: v for k, v in context.items() if not k.startswith("_")}
-
-
-def save_local_replay(project_dir: str, context: dict) -> None:
-    """Save a context for futur replay in the project directory."""
-    replay = Path(project_dir) / ".cookiecutter.json"
-    with replay.open("w") as f:
-        json.dump(context.get("cookiecutter", {}), f)
-
-
-def load_local_replay(project_dir: str) -> dict:
-    """Load a local context for replay from the project directory."""
-    if not (replay := Path(project_dir) / ".cookiecutter.json").is_file():
-        raise FileNotFoundError(
-            "No cookiecutter local replay found. Maybe you try"
-            "to use cookiecutterz with a genuine cookiecutter project.",
-        )
-    with replay.open("r") as f:
-        return json.load(f)
 
 
 def load_inherited_templates(context: dict, env: Environment) -> Environment:
@@ -98,36 +79,6 @@ def install_inherited(project_dir: str, context: dict) -> None:
 
     if ancestors_templates:
         context["cookiecutter"]["_ancestors_templates"] = ancestors_templates
-
-
-def remake(project_dir: str) -> None:
-    """Generates the project from its local replay in a <.remake> sub directory."""
-    replay_context = load_local_replay(project_dir)
-    remake_dir: Path = Path(project_dir) / ".remake"
-    remake_dir.mkdir(parents=True, exist_ok=True)
-    _template = replay_context.get("_template")
-    _cwd = replay_context.get("_cwd")
-
-    if not repository.is_repo_url(_template):
-        _template = f"{_cwd}/{_template}"
-
-    # Setup the cookiecutter context
-    context = get_public_keys(replay_context)
-
-    # Generate a new project from the updated template
-    main.cookiecutter(
-        _template,
-        extra_context=context,
-        output_dir=str(remake_dir),
-        accept_hooks=True,
-        overwrite_if_exists=True,
-        skip_if_file_exists=False,
-    )
-
-
-def update(project_dir: str) -> None:
-    """Update the current managed cookiecutter template distribution."""
-    remake(project_dir, tmp_dir)
 
 
 # Copyright (c) 2023 - Gilles Coissac

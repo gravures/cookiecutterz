@@ -13,7 +13,6 @@ from cookiecutter.hooks import run_hook
 from cookiecutterz.extensions import (
     install_inherited,
     load_inherited_templates,
-    save_local_replay,
 )
 
 
@@ -40,7 +39,9 @@ def uncache(exclude):
 
 
 ##
-# MONKEY PATCHING COOKICUTTER
+# MONKEY PATCHING COOKIECUTTER
+
+
 def __run_hook_from_repo_dir(
     repo_dir,
     hook_name,
@@ -65,8 +66,6 @@ def _run_hook(hook_name: str, project_dir: str, context: dict):
     run_hook(hook_name, project_dir, context)
     if hook_name == "pre_gen_project":  # noqa: PLR2004
         install_inherited(project_dir, context)
-    elif hook_name == "post_gen_project":  # noqa: PLR2004
-        save_local_replay(project_dir, context)
 
 
 def _generate_file(
@@ -82,8 +81,7 @@ def _generate_file(
 
 
 generate._run_hook_from_repo_dir = __run_hook_from_repo_dir
-# FIXME: generate._run_hook !?
-generate._run_hook = hooks.run_hook = _run_hook
+generate._run_hook = hooks.run_hook = _run_hook  # type: ignore - generate._run_hook !?
 
 generate.generate_file = _generate_file
 uncache(["cookiecutter.hooks", "cookiecutter.generate"])
