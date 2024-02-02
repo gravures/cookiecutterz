@@ -2,9 +2,6 @@
 requires      = ["setuptools>=61", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
-[tool.pdm]
-distribution = false
-
 [project]
 name = "cookiecutterz"
 description = "A cookiecutter extension providing template inheritance"
@@ -34,14 +31,6 @@ source   = "https://github.com/gravures/cookiecutterz"
 [project.scripts]
 cookiecutter = "cookiecutterz.main:main"
 
-[project.optional-dependencies]
-
-[tool.pdm.dev-dependencies]
-dev      = []
-test     = ["pytest", "hypothesis", "coverage", "covdefaults"]
-lint     = ["ruff"]
-notebook = ["jupyter-core", "jupyter-client", "ipykernel", "icecream"]
-
 [tool.setuptools]
 platforms = ["Windows", "macOS", "Linux"]
 
@@ -53,6 +42,15 @@ write_to       = "src/cookiecutterz/_version.py"
 root           = "."
 version_scheme = "guess-next-dev"
 local_scheme   = "no-local-version"
+
+[tool.pdm]
+distribution = true
+
+[tool.pdm.dev-dependencies]
+dev      = []
+test     = ["pytest", "hypothesis", "coverage", "covdefaults"]
+lint     = ["ruff"]
+notebook = ["jupyter-core", "jupyter-client", "ipykernel", "icecream"]
 
 [tool.coverage.run]
 command_line = "-m pytest"

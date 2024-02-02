@@ -1,6 +1,8 @@
 # Copyright (c) 2023 - Gilles Coissac
 # See end of file for extended copyright information
 """A cookiecutter extension package."""
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 
@@ -30,7 +32,7 @@ def uncache(exclude):
             to_uncache.append(mod)
             continue
         for pkg in pkgs:
-            if mod.startswith(pkg + "."):
+            if mod.startswith(f"{pkg}."):
                 to_uncache.append(mod)
                 break
     for mod in to_uncache:
@@ -47,7 +49,7 @@ def __run_hook_from_repo_dir(
     delete_project_on_failure,
 ):
     """Hook for registring cwd for further update of project."""
-    if hook_name == "pre_gen_project":
+    if hook_name == "pre_gen_project":  # noqa: PLR2004
         context["cookiecutter"]["_cwd"] = str(Path.cwd())
     _run_hook_from_repo_dir(
         repo_dir,
@@ -61,9 +63,9 @@ def __run_hook_from_repo_dir(
 def _run_hook(hook_name: str, project_dir: str, context: dict):
     """Hook for installing inherited templates if provided."""
     run_hook(hook_name, project_dir, context)
-    if hook_name == "pre_gen_project":
+    if hook_name == "pre_gen_project":  # noqa: PLR2004
         install_inherited(project_dir, context)
-    elif hook_name == "post_gen_project":
+    elif hook_name == "post_gen_project":  # noqa: PLR2004
         save_local_replay(project_dir, context)
 
 
@@ -80,7 +82,9 @@ def _generate_file(
 
 
 generate._run_hook_from_repo_dir = __run_hook_from_repo_dir
-generate.run_hook = hooks.run_hook = _run_hook
+# FIXME: generate._run_hook !?
+generate._run_hook = hooks.run_hook = _run_hook
+
 generate.generate_file = _generate_file
 uncache(["cookiecutter.hooks", "cookiecutter.generate"])
 
@@ -88,15 +92,15 @@ uncache(["cookiecutter.hooks", "cookiecutter.generate"])
 # Copyright (c) 2023 - Gilles Coissac
 # This file is part of Cookicutterz program.
 #
-# Lyndows is free software: you can redistribute it and/or modify
+# Cookiecutterz is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published
 # by the Free Software Foundation, either version 3 of the License,
 # or (at your option) any later version.
 #
-# Lyndows is distributed in the hope that it will be useful,
+# Cookiecutterz is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty
 # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 # See the GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with Lyndows. If not, see <https://www.gnu.org/licenses/>
+# along with Cookiecutterz. If not, see <https://www.gnu.org/licenses/>
