@@ -57,7 +57,7 @@ def install_inherited(project_dir: str, context: dict) -> None:
             abbreviations=config_dict["abbreviations"],
             clone_to_dir=config_dict["cookiecutters_dir"],
             checkout=None,
-            no_input=False,
+            no_input=True,
         )
 
         # templates from inherited cookiecutters

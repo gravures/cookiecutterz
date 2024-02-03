@@ -48,12 +48,15 @@ local_scheme   = "no-local-version"
 distribution = true
 
 [tool.pdm.dev-dependencies]
-dev      = []
-test     = ["pytest", "hypothesis", "coverage", "covdefaults"]
-lint     = ["ruff"]
-notebook = ["jupyter-core", "jupyter-client", "ipykernel", "icecream"]
+test = ["pytest", "hypothesis", "coverage", "covdefaults"]
+lint = ["ruff"]
+
+[tool.pdm.scripts]
+_cruft = { shell = "clear && pytest -s tests/create_project_test.py::test_cruft_create" }
+_cc    = { shell = "clear && pytest -s tests/create_project_test.py::test_cookiecutter_create" }
+test   = "coverage run -m pytest"
+report = "coverage report"
 
 [tool.coverage.run]
-command_line = "-m pytest"
-plugins      = ["covdefaults"]
-source       = ["src"]
+plugins = ["covdefaults"]
+source  = ["src"]
