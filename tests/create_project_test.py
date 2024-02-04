@@ -11,6 +11,8 @@ import pytest
 from pytest import fixture
 
 
+#
+# UTILITIES
 def run(*args: str, capture: bool = False, **kwargs) -> str:
     """Run a command and return stdout."""
     cmd = shutil.which(args[0], mode=os.X_OK)
@@ -31,6 +33,8 @@ def run(*args: str, capture: bool = False, **kwargs) -> str:
     return cp.stdout or ""
 
 
+#
+# FIXTURES
 TEST_DIR_NAME = "test_template_creation"
 TEST_TEMPLATE = Path.home() / "DEV" / "REPOS" / "cookiecutter_pep_517"
 
@@ -56,6 +60,8 @@ def extra_context(request) -> dict[str, str]:
     }
 
 
+#
+# PROPERTIES AND TEST CASES
 @pytest.mark.fix_data("Cookiecutter")
 def test_cookiecutter_create(tmp_dir, extra_context):
     _xc = (f"{k}={v}" for k, v in extra_context.items())
@@ -66,3 +72,10 @@ def test_cookiecutter_create(tmp_dir, extra_context):
 def test_cruft_create(tmp_dir, extra_context):
     _xc = json.dumps(extra_context)
     run("cruft", "create", "--no-input", str(TEST_TEMPLATE), "--extra-context", _xc, cwd=tmp_dir)
+
+
+# should forbid circular dependencies beetween templates
+# template dont have to overload input field of ancestor
+# template could overload input field of ancestor
+# template do not need to redefined _copy_without_render dict of ancestor
+# template could have multiples inheritance

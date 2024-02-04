@@ -38,10 +38,9 @@ def uncache(exclude):
         del sys.modules[mod]
 
 
-##
+#
 # MONKEY PATCHING COOKIECUTTER
-
-
+#
 def __run_hook_from_repo_dir(
     repo_dir,
     hook_name,
@@ -81,7 +80,6 @@ def _generate_file(
 
 
 generate._run_hook_from_repo_dir = __run_hook_from_repo_dir
-# generate._run_hook = hooks.run_hook = _run_hook  # type: ignore - generate._run_hook !?
 hooks.run_hook = _run_hook
 generate.generate_file = _generate_file
 uncache(["cookiecutter.hooks", "cookiecutter.generate"])
