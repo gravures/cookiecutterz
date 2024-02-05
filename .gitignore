@@ -143,6 +143,7 @@ cython_debug/
 
 # PDM
 .pdm-python
+.pdm-plugins
 
 # setuptools-scm version files
 _version.py

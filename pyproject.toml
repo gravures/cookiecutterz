@@ -9,7 +9,7 @@ authors = [{ name = "Gilles Coissac", email = "gilles@ideographe.fr" }]
 readme = "README.md"
 license = { text = "GPL-3.0" }
 requires-python = ">=3.8"
-dependencies = ["cookiecutter>=2.3.0", "cruft>=2.15.0"]
+dependencies = ["cookiecutter>=2.3.0", "cruft>=2.15.0", "pdm>=2.12.3"]
 keywords = ['cookiecutter', 'template', 'template-engine']
 classifiers = [
   "Intended Audience :: Developers",
@@ -46,16 +46,22 @@ local_scheme   = "no-local-version"
 
 [tool.pdm]
 distribution = true
+plugins      = ["-e file:///${PROJECT_ROOT}"]
+
+[project.entry-points.pdm]
+pdm-cruft = "cookiecutterz.pdm:main"
 
 [tool.pdm.dev-dependencies]
 test = ["pytest", "hypothesis", "coverage", "covdefaults"]
 lint = ["ruff"]
+dev  = ["setuptools>=69.0.3"]
 
 [tool.pdm.scripts]
-_cruft = { shell = "clear && pytest -s tests/create_project_test.py::test_cruft_create" }
-_cc    = { shell = "clear && pytest -s tests/create_project_test.py::test_cookiecutter_create" }
-test   = "coverage run -m pytest"
-report = "coverage report"
+version = "setup.py --version"
+_cruft  = { shell = "clear && pytest -s tests/create_project_test.py::test_cruft_create" }
+_cc     = { shell = "clear && pytest -s tests/create_project_test.py::test_cookiecutter_create" }
+test    = "coverage run -m pytest"
+report  = "coverage report"
 
 [tool.coverage.run]
 plugins = ["covdefaults"]
