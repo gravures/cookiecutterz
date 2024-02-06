@@ -57,11 +57,12 @@ lint = ["ruff"]
 dev  = ["setuptools>=69.0.3"]
 
 [tool.pdm.scripts]
-version = "setup.py --version"
-_cruft  = { shell = "clear && pytest -s tests/create_project_test.py::test_cruft_create" }
-_cc     = { shell = "clear && pytest -s tests/create_project_test.py::test_cookiecutter_create" }
-test    = "coverage run -m pytest"
-report  = "coverage report"
+version    = "setup.py --version"
+test_cruft = { shell = "clear && pytest -s tests/create_project_test.py::test_cruft_create" }
+test_pdm   = { shell = "clear && pytest -s tests/create_project_test.py::test_pdm_create" }
+test_cc    = { shell = "clear && pytest -s tests/create_project_test.py::test_cookiecutter_create" }
+test       = "coverage run -m pytest"
+report     = "coverage report"
 
 [tool.coverage.run]
 plugins = ["covdefaults"]

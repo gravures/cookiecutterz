@@ -35,8 +35,8 @@ def run(*args: str, capture: bool = False, **kwargs) -> str:
 
 #
 # FIXTURES
-TEST_DIR_NAME = "test_template_creation"
-TEST_TEMPLATE = Path.home() / "DEV" / "REPOS" / "cookiecutter_pep_517"
+TEST_DIR_NAME: str = "test_template_creation"
+TEST_TEMPLATE: Path = Path.home() / "DEV" / "REPOS" / "cookiecutter_pep_517"
 
 
 @fixture(scope="session")
@@ -72,6 +72,21 @@ def test_cookiecutter_create(tmp_dir, extra_context):
 def test_cruft_create(tmp_dir, extra_context):
     _xc = json.dumps(extra_context)
     run("cruft", "create", "--no-input", str(TEST_TEMPLATE), "--extra-context", _xc, cwd=tmp_dir)
+
+
+@pytest.mark.fix_data("Pdm")
+def test_pdm_create(tmp_dir, extra_context):
+    _xc = json.dumps(extra_context)
+    run(
+        "pdm",
+        "init",
+        "--cruft",
+        str(TEST_TEMPLATE),
+        "--no-input",
+        "--extra-context",
+        _xc,
+        cwd=tmp_dir,
+    )
 
 
 # should forbid circular dependencies beetween templates

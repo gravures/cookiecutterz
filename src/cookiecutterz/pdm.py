@@ -34,15 +34,29 @@ class Plugin(Command):
                 "--cruft is passed but cruft is not installed. Install it by `pdm self add cruft`"
             ) from None
 
-        from cruft._cli import create
+        from cruft._cli import app
 
         if not options.template:
             raise PdmUsageError("template argument is required when --cruft is passed")
 
+        if "--output-dir" in options.generator_args:  # noqa: PLR2004
+            raise PdmUsageError(
+                "specify output directory with --project option not with --output-dir."
+            )
+
         try:
-            create(options.template, project.root, *options.generator_args)
-        except BaseException as e:
-            raise RuntimeError("Cruft exited with non-zero status code") from e
+            app(
+                [
+                    "create",
+                    options.template,
+                    "--output-dir",
+                    str(project.root),
+                    *options.generator_args,
+                ]
+            )
+        except SystemExit as e:
+            if e.code:
+                raise RuntimeError("Cruft exited with non-zero status code") from e
 
     def add_arguments(self, parser: ArgumentParser) -> None:
         # NOTE: This will leave us with '--cruft' output after '--overwrite'
