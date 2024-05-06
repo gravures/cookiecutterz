@@ -101,17 +101,19 @@ ignore = [
   'TD001',   # todo format
   'TD002',   # todo format
   'TD003',   # todo format
+  'PT013',   # Found incorrect import of pytest
   'SLF001',
   'PLC2701',
 ]
 
 [lint.per-file-ignores]
 "tests/**.py" = [
-  "T20",  # Allow print statements in tests
-  "D",    # Ignore docstring rules in tests
-  "ANN",  # Ignore type annotations in tests
-  "S101", # Yeah of course we assert in tests
-  "B009", # Allow calling `getattr` in tests since it can be used to make the test clearer.
+  "T20",    # Allow print statements in tests
+  "D",      # Ignore docstring rules in tests
+  "ANN",    # Ignore type annotations in tests
+  "S101",   # Yeah of course we assert in tests
+  "B009",   # Allow calling `getattr` in tests since it can be used to make the test clearer.
+  "CPY001", # missing copyright
 ]
 
 [lint.isort]

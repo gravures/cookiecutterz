@@ -86,7 +86,7 @@ test_cover  = "coverage report"
 tox_testme  = "tox -e py"
 pc_init     = "pre-commit install"
 pc_update   = "pre-commit autoupdate"
-pc_check    = "pre-commit run --all-files"
+pc_check    = { env = { "SKIP" = "basedpyright" }, cmd = "pre-commit run --all-files" }
 dead        = "dead"
 pc_clean    = "pre-commit clean && pre-commit gc"
 deps        = "pdm list --fields name,groups,version,licenses,homepage --sort groups,name,licenses --exclude :sub"
