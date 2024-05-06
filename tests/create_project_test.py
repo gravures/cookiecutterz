@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
+from tempfile import mkdtemp
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -38,7 +39,6 @@ def run(*args: str, capture: bool = False, **kwargs: Any) -> str:
     return cp.stdout or ""
 
 
-TEST_DIR_NAME = "test_template_creation"
 TEST_TEMPLATE = "git@github.com:audreyfeldroy/cookiecutter-pypackage.git"
 
 
@@ -46,8 +46,7 @@ TEST_TEMPLATE = "git@github.com:audreyfeldroy/cookiecutter-pypackage.git"
 # FIXTURES
 @fixture(scope="session")
 def tmp_dir() -> Generator[Path, None, None]:
-    test_dir = Path.cwd() / TEST_DIR_NAME
-    test_dir.mkdir(exist_ok=True)
+    test_dir = Path(mkdtemp())
     yield test_dir
     shutil.rmtree(test_dir)
 
