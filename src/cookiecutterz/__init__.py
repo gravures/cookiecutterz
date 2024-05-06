@@ -22,7 +22,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from cookiecutter import generate, hooks
-from cookiecutter.generate import _run_hook_from_repo_dir, generate_file
+from cookiecutter.generate import (
+    _run_hook_from_repo_dir,  # pyright: ignore[reportAttributeAccessIssue]
+    generate_file,
+)
 from cookiecutter.hooks import run_hook
 
 from cookiecutterz._version import __version__
@@ -99,7 +102,7 @@ def _generate_file(
     generate_file(project_dir, infile, context, env, skip_if_file_exists)
 
 
-generate._run_hook_from_repo_dir = __run_hook_from_repo_dir
+generate._run_hook_from_repo_dir = __run_hook_from_repo_dir  # pyright: ignore[reportAttributeAccessIssue]
 # generate._run_hook = hooks.run_hook = _run_hook
 hooks.run_hook = _run_hook
 generate.generate_file = _generate_file

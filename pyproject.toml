@@ -34,6 +34,8 @@ cruft        = "cookiecutterz.cruft:main"
 # Static type checking with basedPyright
 #####################################################
 [tool.basedpyright]
+stubPath                          = "./typings"
+ignore                            = ["./typings"]
 pythonPlatform                    = "all"
 typeCheckingMode                  = "all"
 reportAny                         = false
