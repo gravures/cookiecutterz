@@ -34,6 +34,7 @@ cruft        = "cookiecutterz.cruft:main"
 # Static type checking with basedPyright
 #####################################################
 [tool.basedpyright]
+venvPath                          = "."
 pythonPlatform                    = "all"
 typeCheckingMode                  = "all"
 reportAny                         = false
@@ -80,7 +81,7 @@ test = ["pytest", "hypothesis", "coverage[toml]", "covdefaults", "tox>=4.0"]
 xrequire    = "pdm export -f requirements -o requirements.txt"
 test        = "pytest -s -v -k {args}"
 test_all    = "coverage run -m pytest"
-test_typing = "pdm run basedpyright --stats ./src/tomlraider"
+test_typing = "pdm run basedpyright --stats ./src/cookiecutterz"
 test_cover  = "coverage report"
 tox_testme  = "tox -e py"
 pc_init     = "pre-commit install"
