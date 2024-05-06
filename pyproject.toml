@@ -34,7 +34,6 @@ cruft        = "cookiecutterz.cruft:main"
 # Static type checking with basedPyright
 #####################################################
 [tool.basedpyright]
-venvPath                          = "."
 pythonPlatform                    = "all"
 typeCheckingMode                  = "all"
 reportAny                         = false
@@ -93,9 +92,3 @@ deps        = "pdm list --fields name,groups,version,licenses,homepage --sort gr
 
 [tool.pdm.scripts.pc_safety]
 composite = ["require", "pre-commit run python-safety-dependencies-check"]
-
-[tool.pdm.scripts._cruft]
-shell = "clear && pytest -s tests/create_project_test.py::test_cruft_create"
-
-[tool.pdm.scripts._cc]
-shell = "clear && pytest -s tests/create_project_test.py::test_cookiecutter_create"

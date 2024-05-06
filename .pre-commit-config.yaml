@@ -66,10 +66,6 @@ repos:
       - id: rst-backticks
       - id: rst-directive-colons
       - id: rst-inline-touching-normal
-  - repo: https://github.com/DetachHead/basedpyright
-    rev: v1.10.3
-    hooks:
-      - id: basedpyright
   - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
     rev: v1.3.3
     hooks:

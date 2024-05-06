@@ -25,6 +25,7 @@ from cookiecutter import generate, hooks
 from cookiecutter.generate import _run_hook_from_repo_dir, generate_file
 from cookiecutter.hooks import run_hook
 
+from cookiecutterz._version import __version__
 from cookiecutterz.extensions import (
     install_inherited,
     load_inherited_templates,
@@ -33,6 +34,8 @@ from cookiecutterz.extensions import (
 
 if TYPE_CHECKING:
     import jinja2
+
+__all__ = ["__version__"]
 
 
 def uncache(exclude: list[str]) -> None:
