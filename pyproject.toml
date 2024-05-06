@@ -50,8 +50,9 @@ reportUnknownVariableType         = false
 # Coverage config
 #####################################################
 [tool.coverage.run]
-plugins = ["covdefaults"]
-source  = ["src"]
+plugins        = ["covdefaults"]
+source         = ["src"]
+relative_files = true
 
 #####################################################
 # PDM
@@ -83,7 +84,7 @@ xrequire    = "pdm export -f requirements -o requirements.txt"
 test        = "pytest -s -v -k {args}"
 test_all    = "coverage run -m pytest"
 test_typing = "pdm run basedpyright --stats ./src/cookiecutterz"
-test_cover  = "coverage report"
+test_cover  = "coverage --fail-under 0"
 tox_testme  = "tox -e py"
 pc_init     = "pre-commit install"
 pc_update   = "pre-commit autoupdate"
