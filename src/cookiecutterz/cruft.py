@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Cookiecutterz. If not, see <https://www.gnu.org/licenses/>
-"""Crufter wrapper file."""
+"""Cruft wrapper file."""
 
 from __future__ import annotations
 
