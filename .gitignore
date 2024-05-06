@@ -104,6 +104,13 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# Sphinx documentation
+docs/build/
+docs/sources/api/*rst
+
+# mkdocs documentation
+/site
+
 # Environments
 .env
 .venv
@@ -117,11 +124,11 @@ venv.bak/
 .spyderproject
 .spyproject
 
+# VsCode
+.vscode/
+
 # Rope project settings
 .ropeproject
-
-# mkdocs documentation
-/site
 
 # mypy
 .mypy_cache/
@@ -134,15 +141,27 @@ dmypy.json
 # pytype static type analyzer
 .pytype/
 
-# usefull
-.work
-.notebooks
-
 # Cython debug symbols
 cython_debug/
 
+# distribution generated file
+src/**/_version.py
+
+# sourcery
+.sourcery.yaml
+
+# ruff
+.ruff_cache
+
+# common
+.work/
+builddir/
+.flatpak/
+.flatpak-builder/.work
+.notebooks
+
 # PDM
 .pdm-python
+.pdm-build
+.pdm-plugins
 
-# setuptools-scm version files
-_version.py

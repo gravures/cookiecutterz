@@ -1,0 +1,30 @@
+name: tests
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  testing:
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup pdm to Python ${{ matrix.python-version }}
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          pdm sync --no-editable --dev -G test -G dev
+
+      - name: Tests with tox
+        run: |
+          pdm run tox --version
+          pdm run tox -e py

@@ -1,22 +1,20 @@
-[build-system]
-requires      = ["setuptools>=61", "setuptools_scm[toml]>=6.2"]
-build-backend = "setuptools.build_meta"
-
+#####################################################
+# Project Metadatas
+#####################################################
 [project]
 name = "cookiecutterz"
 description = "A cookiecutter extension providing template inheritance"
 authors = [{ name = "Gilles Coissac", email = "gilles@ideographe.fr" }]
-readme = "README.md"
 license = { text = "GPL-3.0" }
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = ["cookiecutter>=2.3.0", "cruft>=2.15.0"]
+readme = "README.md"
 keywords = ['cookiecutter', 'template', 'template-engine']
 classifiers = [
   "Intended Audience :: Developers",
   "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
@@ -32,31 +30,71 @@ source   = "https://github.com/gravures/cookiecutterz"
 cookiecutter = "cookiecutterz.main:main"
 cruft        = "cookiecutterz.cruft:main"
 
-[tool.setuptools]
-platforms = ["Windows", "macOS", "Linux"]
+#####################################################
+# Static type checking with basedPyright
+#####################################################
+[tool.basedpyright]
+pythonPlatform                    = "all"
+typeCheckingMode                  = "all"
+reportAny                         = false
+reportUnusedCallResult            = false
+reportImplicitStringConcatenation = false
+reportImplicitOverride            = false
+reportMissingSuperCall            = false
+reportPrivateUsage                = false
+reportUnknownVariableType         = false
 
-[tool.setuptools.packages.find]
-where = ["src"]
+#####################################################
+# Coverage config
+#####################################################
+[tool.coverage.run]
+plugins = ["covdefaults"]
+source  = ["src"]
 
-[tool.setuptools_scm]
-write_to       = "src/cookiecutterz/_version.py"
-root           = "."
-version_scheme = "guess-next-dev"
-local_scheme   = "no-local-version"
+#####################################################
+# PDM
+#####################################################
+[build-system]
+requires      = ["pdm-backend"]
+build-backend = "pdm.backend"
 
 [tool.pdm]
 distribution = true
 
+[tool.pdm.version]
+source         = "scm"
+write_to       = "cookiecutterz/_version.py"
+write_template = "__version__ = '{}'"
+
 [tool.pdm.dev-dependencies]
-test = ["pytest", "hypothesis", "coverage", "covdefaults"]
-lint = ["ruff"]
+dev = [
+  "ruff==0.4.1",
+  "basedpyright==1.10.3",
+  "pre-commit==3.7.0",
+  "tox-pdm>=0.7.2",
+  "dead>=1.5.2",
+]
+test = ["pytest", "hypothesis", "coverage[toml]", "covdefaults", "tox>=4.0"]
 
 [tool.pdm.scripts]
-_cruft = { shell = "clear && pytest -s tests/create_project_test.py::test_cruft_create" }
-_cc    = { shell = "clear && pytest -s tests/create_project_test.py::test_cookiecutter_create" }
-test   = "coverage run -m pytest"
-report = "coverage report"
+xrequire    = "pdm export -f requirements -o requirements.txt"
+test        = "pytest -s -v -k {args}"
+test_all    = "coverage run -m pytest"
+test_typing = "pdm run basedpyright --stats ./src/tomlraider"
+test_cover  = "coverage report"
+tox_testme  = "tox -e py"
+pc_init     = "pre-commit install"
+pc_update   = "pre-commit autoupdate"
+pc_check    = "pre-commit run --all-files"
+dead        = "dead"
+pc_clean    = "pre-commit clean && pre-commit gc"
+deps        = "pdm list --fields name,groups,version,licenses,homepage --sort groups,name,licenses --exclude :sub"
 
-[tool.coverage.run]
-plugins = ["covdefaults"]
-source  = ["src"]
+[tool.pdm.scripts.pc_safety]
+composite = ["require", "pre-commit run python-safety-dependencies-check"]
+
+[tool.pdm.scripts._cruft]
+shell = "clear && pytest -s tests/create_project_test.py::test_cruft_create"
+
+[tool.pdm.scripts._cc]
+shell = "clear && pytest -s tests/create_project_test.py::test_cookiecutter_create"
