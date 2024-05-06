@@ -1,21 +1,4 @@
 # Copyright (c) 2023 - Gilles Coissac
-# See end of file for extended copyright information
-from __future__ import annotations
-
-from cruft._cli import app
-
-import cookiecutterz  # noqa: F401
-
-
-def main():
-    app()
-
-
-if __name__ == "__main__":
-    main()
-
-
-# Copyright (c) 2023 - Gilles Coissac
 # This file is part of Cookicutterz program.
 #
 # Cookiecutterz is free software: you can redistribute it and/or modify
@@ -30,3 +13,18 @@ if __name__ == "__main__":
 #
 # You should have received a copy of the GNU General Public License
 # along with Cookiecutterz. If not, see <https://www.gnu.org/licenses/>
+"""Crufter wrapper file."""
+
+from __future__ import annotations
+
+from cruft._cli import app  # pyright: ignore[reportMissingTypeStubs]
+
+import cookiecutterz  # pyright: ignore[reportUnusedImport] # noqa: F401
+
+
+def main():  # noqa: D103
+    app()
+
+
+if __name__ == "__main__":
+    main()
