@@ -64,6 +64,7 @@ jobs:
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COVERAGE_DATA_BRANCH: python-coverage
+          COMMENT_FILENAME: python-coverage.txt
           MERGE_COVERAGE_FILES: true
 
       - name: Store Pull Request comment to be posted
