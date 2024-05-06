@@ -39,7 +39,7 @@ def run(*args: str, capture: bool = False, **kwargs: Any) -> str:
     return cp.stdout or ""
 
 
-TEST_TEMPLATE = "git@github.com:audreyfeldroy/cookiecutter-pypackage.git"
+TEST_TEMPLATE = "https://github.com/audreyfeldroy/cookiecutter-pypackage"
 
 
 #
