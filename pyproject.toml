@@ -74,6 +74,8 @@ exclude_lines = [
   "-> ['\"]?NoReturn['\"]?:",
   # non-runnable code
   "if __name__ == ['\"]__main__['\"]:$",
+  #
+  "@overload",
 ]
 
 #####################################################
@@ -107,7 +109,7 @@ test        = "pytest -s -v -k {args}"
 test_all    = "coverage run -m pytest"
 test_typing = "pdm run basedpyright --stats ./src/cookiecutterz"
 test_cover  = "coverage report"
-tox_testme  = "tox -e py"
+tox_testme  = "tox --develop -r -e py"
 pc_init     = "pre-commit install"
 pc_update   = "pre-commit autoupdate"
 pc_check    = { env = { "SKIP" = "basedpyright" }, cmd = "pre-commit run --all-files" }
