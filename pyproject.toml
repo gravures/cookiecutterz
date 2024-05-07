@@ -50,9 +50,31 @@ reportUnknownVariableType         = false
 # Coverage config
 #####################################################
 [tool.coverage.run]
-plugins        = ["covdefaults"]
 source         = ["src"]
+omit           = ["*/__main__.py", "*/_version.py"]
+branch         = true
 relative_files = true
+
+[tool.coverage.report]
+fail_under = 0
+show_missing = true
+skip_covered = true
+exclude_lines = [
+  # a more strict default pragma
+  "# pragma: no cover\\b",
+  # allow defensive code
+  "^\\s*raise AssertionError\\b",
+  "^\\s*raise NotImplementedError\b",
+  "^\\s*return NotImplemented\\b",
+  "^\\s*raise$",
+  # typing-related code
+  "^\\s*if (False|TYPE_CHECKING):",
+  ": \\.\\.\\.(\\s*#.*)?$",
+  "^ +\\.\\.\\.$",
+  "-> ['\"]?NoReturn['\"]?:",
+  # non-runnable code
+  "if __name__ == ['\"]__main__['\"]:$",
+]
 
 #####################################################
 # PDM
@@ -84,7 +106,7 @@ xrequire    = "pdm export -f requirements -o requirements.txt"
 test        = "pytest -s -v -k {args}"
 test_all    = "coverage run -m pytest"
 test_typing = "pdm run basedpyright --stats ./src/cookiecutterz"
-test_cover  = "coverage --fail-under 0"
+test_cover  = "coverage report"
 tox_testme  = "tox -e py"
 pc_init     = "pre-commit install"
 pc_update   = "pre-commit autoupdate"
