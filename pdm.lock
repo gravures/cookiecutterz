@@ -5,7 +5,7 @@
 groups = ["default", "dev", "test"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:600edcd05fc86a17c55b90956198b97fc241cb3d1420c4cbbea2434f6bec103e"
+content_hash = "sha256:49668f5a68a733f5b3b698f10319aa17f0a84c19b87e154b479cb79f6f12706b"
 
 [[package]]
 name = "arrow"
@@ -222,20 +222,6 @@ files = [
 ]
 
 [[package]]
-name = "covdefaults"
-version = "2.3.0"
-requires_python = ">=3.7"
-summary = "A coverage plugin to provide sensible default settings"
-groups = ["test"]
-dependencies = [
-    "coverage>=6.0.2",
-]
-files = [
-    {file = "covdefaults-2.3.0-py2.py3-none-any.whl", hash = "sha256:2832961f6ffcfe4b57c338bc3418a3526f495c26fb9c54565409c5532f7c41be"},
-    {file = "covdefaults-2.3.0.tar.gz", hash = "sha256:4e99f679f12d792bc62e5510fa3eb59546ed47bd569e36e4fddc4081c9c3ebf7"},
-]
-
-[[package]]
 name = "coverage"
 version = "7.5.1"
 requires_python = ">=3.8"
@@ -436,7 +422,7 @@ files = [
 
 [[package]]
 name = "hypothesis"
-version = "6.100.4"
+version = "6.100.5"
 requires_python = ">=3.8"
 summary = "A library for property-based testing"
 groups = ["test"]
@@ -446,8 +432,8 @@ dependencies = [
     "sortedcontainers<3.0.0,>=2.1.0",
 ]
 files = [
-    {file = "hypothesis-6.100.4-py3-none-any.whl", hash = "sha256:f1909d4702d21be55720bbbc58e0b42172e14bf712a8ecbab00ad6ae209a5ec9"},
-    {file = "hypothesis-6.100.4.tar.gz", hash = "sha256:f6858353a5fae943cae149cc618b9f2b261143df9d8d792cf1065a1b289bbb24"},
+    {file = "hypothesis-6.100.5-py3-none-any.whl", hash = "sha256:d2f875a8791abdf68599e85cc9238f7239a73b72362d34be95e532e811766723"},
+    {file = "hypothesis-6.100.5.tar.gz", hash = "sha256:14e06081459ee96ca8f1ed996b6fc19f71910281e01f6a9fa3d9d6e68bbe4a25"},
 ]
 
 [[package]]

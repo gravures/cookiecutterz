@@ -38,8 +38,6 @@ repos:
         exclude: ^tests/
       - id: check-json
         exclude: ^tests/
-      - id: pretty-format-json
-        exclude: ^tests/
       - id: check-xml
         exclude: ^tests/
       - id: check-toml
