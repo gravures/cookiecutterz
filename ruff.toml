@@ -79,8 +79,8 @@ select = [
   'PERF',  # perflint
   'FURB',  # refuurb
   # 'PD',    # panda-vet
-
 ]
+
 ignore = [
   'COM812', # missing trailing comma
   'COM819', # prohibited-trailing-comma
