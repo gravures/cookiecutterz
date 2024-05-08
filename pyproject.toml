@@ -7,7 +7,7 @@ description = "A cookiecutter extension providing template inheritance"
 authors = [{ name = "Gilles Coissac", email = "gilles@ideographe.fr" }]
 license = { text = "GPL-3.0" }
 requires-python = ">=3.9"
-dependencies = ["cookiecutter>=2.3.0", "cruft>=2.15.0"]
+dependencies = ["cookiecutter>=2.3.0", "cruft>=2.15.0", "pdm>=2.15"]
 readme = "README.md"
 keywords = ['cookiecutter', 'template', 'template-engine']
 classifiers = [
@@ -39,6 +39,10 @@ build-backend = "pdm.backend"
 
 [tool.pdm]
 distribution = true
+plugins      = ["-e file:///${PROJECT_ROOT}"]
+
+[project.entry-points.pdm]
+pdm-cruft = "cookiecutterz.pdm:main"
 
 [tool.pdm.version]
 source         = "scm"

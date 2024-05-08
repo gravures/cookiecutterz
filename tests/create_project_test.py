@@ -67,15 +67,30 @@ def extra_context(request: Any) -> dict[str, str]:
 #
 # PROPERTIES AND TEST CASES
 @pytest.mark.fix_data("Cookiecutter")
-def test_cookiecutter_create(tmp_dir: Path, extra_context: dict[str, str]):
+def test_cookiecutter_create(tmp_dir: Path, extra_context: dict[str, str]) -> None:
     _xc = (f"{k}={v}" for k, v in extra_context.items())
     run("cookiecutter", "--no-input", str(TEST_TEMPLATE), *_xc, cwd=tmp_dir)
 
 
 @pytest.mark.fix_data("Cruft")
 def test_cruft_create(tmp_dir: Path, extra_context: dict[str, str]):
-    _xc = json.dumps(extra_context)
+    _xc: str = json.dumps(extra_context)
     run("cruft", "create", "--no-input", str(TEST_TEMPLATE), "--extra-context", _xc, cwd=tmp_dir)
+
+
+@pytest.mark.fix_data("Pdm")
+def test_pdm_create(tmp_dir: Path, extra_context: dict[str, str]) -> None:
+    _xc: str = json.dumps(extra_context)
+    run(
+        "pdm",
+        "init",
+        "--cruft",
+        str(TEST_TEMPLATE),
+        "--no-input",
+        "--extra-context",
+        _xc,
+        cwd=tmp_dir,
+    )
 
 
 # should forbid circular dependencies between templates
