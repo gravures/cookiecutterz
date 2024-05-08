@@ -17,13 +17,13 @@
 
 from __future__ import annotations
 
-from click.utils import echo
+from click import secho
 from cookiecutter.cli import main as _main
 
 
 def main():  # noqa: D103
-    echo("This the cookiecutter(z) program version with template extension feature.")
-    echo("")
+    secho("This a cookiecutter(z) program version with template extension feature.", fg="green")
+    secho("")
     _main()
 
 
