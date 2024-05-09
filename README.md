@@ -5,10 +5,11 @@
 | Name                              |    Stmts |     Miss |   Branch |   BrPart |   Cover |   Missing |
 |---------------------------------- | -------: | -------: | -------: | -------: | ------: | --------: |
 | src/cookiecutterz/\_\_init\_\_.py |       44 |        8 |       18 |        0 |     81% |75-77, 88-90, 101-102 |
-| src/cookiecutterz/cruft.py        |        6 |        6 |        0 |        0 |      0% |     16-26 |
+| src/cookiecutterz/cruft.py        |        8 |        8 |        0 |        0 |      0% |     16-28 |
 | src/cookiecutterz/extensions.py   |       37 |       24 |       10 |        0 |     28% |33, 37, 42, 47-52, 57-96 |
 | src/cookiecutterz/main.py         |        8 |        8 |        0 |        0 |      0% |     16-27 |
-|                         **TOTAL** |   **95** |   **46** |   **28** |    **0** | **51%** |           |
+| src/cookiecutterz/pdm.py          |       40 |       40 |       12 |        0 |      0% |    16-101 |
+|                         **TOTAL** |  **137** |   **88** |   **40** |    **0** | **36%** |           |
 
 
 ## Setup coverage badge
