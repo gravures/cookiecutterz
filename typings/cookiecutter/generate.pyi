@@ -7,8 +7,7 @@ from jinja2 import Environment
 
 """Functions for generating a project from a project template."""
 logger = ...
-
-def is_copy_only_path(path, context):  # -> bool:
+def is_copy_only_path(path, context): # -> bool:
     """Check whether the given `path` should only be copied and not rendered.
 
     Returns True if `path` matches a pattern in the given `context` dict,
@@ -20,15 +19,11 @@ def is_copy_only_path(path, context):  # -> bool:
     """
     ...
 
-def apply_overwrites_to_context(
-    context, overwrite_context, *, in_dictionary_variable=...
-):  # -> None:
+def apply_overwrites_to_context(context, overwrite_context, *, in_dictionary_variable=...): # -> None:
     """Modify the given context in place based on the overwrite_context."""
     ...
 
-def generate_context(
-    context_file=..., default_context=..., extra_context=...
-):  # -> OrderedDict[Any, Any]:
+def generate_context(context_file=..., default_context=..., extra_context=...): # -> OrderedDict[Any, Any]:
     """Generate the context for a Cookiecutter project template.
 
     Loads the JSON file as a Python object, with key being the JSON filename.
@@ -40,7 +35,7 @@ def generate_context(
     """
     ...
 
-def generate_file(project_dir, infile, context, env, skip_if_file_exists=...):  # -> None:
+def generate_file(project_dir, infile, context, env, skip_if_file_exists=...): # -> None:
     """Render filename of infile as name of outfile, handle infile correctly.
 
     Dealing with infile appropriately:
@@ -63,25 +58,11 @@ def generate_file(project_dir, infile, context, env, skip_if_file_exists=...):  
     """
     ...
 
-def render_and_create_dir(
-    dirname: str,
-    context: dict,
-    output_dir: os.PathLike[str],
-    environment: Environment,
-    overwrite_if_exists: bool = ...,
-):  # -> tuple[Path, bool]:
+def render_and_create_dir(dirname: str, context: dict, output_dir: os.PathLike[str], environment: Environment, overwrite_if_exists: bool = ...): # -> tuple[Path, bool]:
     """Render name of a directory, create the directory, return its path."""
     ...
 
-def generate_files(
-    repo_dir,
-    context=...,
-    output_dir=...,
-    overwrite_if_exists=...,
-    skip_if_file_exists=...,
-    accept_hooks=...,
-    keep_project_on_failure=...,
-):  # -> str:
+def generate_files(repo_dir, context=..., output_dir=..., overwrite_if_exists=..., skip_if_file_exists=..., accept_hooks=..., keep_project_on_failure=...): # -> str:
     """Render the templates and saves them to files.
 
     :param repo_dir: Project template input directory.

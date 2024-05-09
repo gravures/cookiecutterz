@@ -9,8 +9,7 @@ from pathlib import Path
 logger = ...
 _HOOKS = ...
 EXIT_SUCCESS = ...
-
-def valid_hook(hook_file, hook_name):  # -> bool:
+def valid_hook(hook_file, hook_name): # -> bool:
     """Determine if a hook file is valid.
 
     :param hook_file: The hook file to consider for validity
@@ -19,7 +18,7 @@ def valid_hook(hook_file, hook_name):  # -> bool:
     """
     ...
 
-def find_hook(hook_name, hooks_dir=...):  # -> list[Any] | None:
+def find_hook(hook_name, hooks_dir=...): # -> list[Any] | None:
     """Return a dict of all hook scripts provided.
 
     Must be called with the project template as the current working directory.
@@ -33,7 +32,7 @@ def find_hook(hook_name, hooks_dir=...):  # -> list[Any] | None:
     """
     ...
 
-def run_script(script_path, cwd=...):  # -> None:
+def run_script(script_path, cwd=...): # -> None:
     """Execute a script from a working directory.
 
     :param script_path: Absolute path to the script to run.
@@ -41,7 +40,7 @@ def run_script(script_path, cwd=...):  # -> None:
     """
     ...
 
-def run_script_with_context(script_path, cwd, context):  # -> None:
+def run_script_with_context(script_path, cwd, context): # -> None:
     """Execute a script after rendering it with Jinja.
 
     :param script_path: Absolute path to the script to run.
@@ -50,7 +49,7 @@ def run_script_with_context(script_path, cwd, context):  # -> None:
     """
     ...
 
-def run_hook(hook_name, project_dir, context):  # -> None:
+def run_hook(hook_name, project_dir, context): # -> None:
     """
     Try to find and execute a hook from the specified project directory.
 
@@ -60,9 +59,7 @@ def run_hook(hook_name, project_dir, context):  # -> None:
     """
     ...
 
-def run_hook_from_repo_dir(
-    repo_dir, hook_name, project_dir, context, delete_project_on_failure
-):  # -> None:
+def run_hook_from_repo_dir(repo_dir, hook_name, project_dir, context, delete_project_on_failure): # -> None:
     """Run hook from repo directory, clean project directory if hook fails.
 
     :param repo_dir: Project template input directory.

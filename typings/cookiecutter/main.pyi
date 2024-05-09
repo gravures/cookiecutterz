@@ -11,23 +11,7 @@ The code in this module is also a good example of how to use Cookiecutter as a
 library rather than a script.
 """
 logger = ...
-
-def cookiecutter(
-    template,
-    checkout=...,
-    no_input=...,
-    extra_context=...,
-    replay=...,
-    overwrite_if_exists=...,
-    output_dir=...,
-    config_file=...,
-    default_config=...,
-    password=...,
-    directory=...,
-    skip_if_file_exists=...,
-    accept_hooks=...,
-    keep_project_on_failure=...,
-):  # -> str:
+def cookiecutter(template, checkout=..., no_input=..., extra_context=..., replay=..., overwrite_if_exists=..., output_dir=..., config_file=..., default_config=..., password=..., directory=..., skip_if_file_exists=..., accept_hooks=..., keep_project_on_failure=...): # -> str:
     """
     Run Cookiecutter just as if using it from the command line.
 
@@ -58,8 +42,11 @@ def cookiecutter(
     ...
 
 class _patch_import_path_for_repo:
-    def __init__(self, repo_dir: os.PathLike[str]) -> None: ...
-    def __enter__(self):  # -> None:
+    def __init__(self, repo_dir: os.PathLike[str]) -> None:
         ...
-    def __exit__(self, type, value, traceback):  # -> None:
+
+    def __enter__(self): # -> None:
+        ...
+
+    def __exit__(self, type, value, traceback): # -> None:
         ...

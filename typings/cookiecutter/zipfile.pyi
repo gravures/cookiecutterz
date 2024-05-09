@@ -6,14 +6,7 @@ import os
 from typing import Optional
 
 """Utility functions for handling and fetching repo archives in zip format."""
-
-def unzip(
-    zip_uri: str,
-    is_url: bool,
-    clone_to_dir: os.PathLike[str] = ...,
-    no_input: bool = ...,
-    password: Optional[str] = ...,
-):  # -> str:
+def unzip(zip_uri: str, is_url: bool, clone_to_dir: os.PathLike[str] = ..., no_input: bool = ..., password: Optional[str] = ...): # -> str:
     """Download and unpack a zipfile at a given URI.
 
     This will download the zipfile to the cookiecutter repository,

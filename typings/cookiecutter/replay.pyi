@@ -9,15 +9,14 @@ cookiecutter.replay.
 
 -------------------
 """
-
-def get_file_name(replay_dir, template_name):  # -> str:
+def get_file_name(replay_dir, template_name): # -> str:
     """Get the name of file."""
     ...
 
-def dump(replay_dir: os.PathLike[str], template_name: str, context: dict):  # -> None:
+def dump(replay_dir: os.PathLike[str], template_name: str, context: dict): # -> None:
     """Write json data to file."""
     ...
 
-def load(replay_dir, template_name):  # -> Any:
+def load(replay_dir, template_name): # -> Any:
     """Read json data from file."""
     ...

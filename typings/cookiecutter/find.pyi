@@ -8,7 +8,6 @@ from jinja2 import Environment
 
 """Functions for finding Cookiecutter templates and other components."""
 logger = ...
-
 def find_template(repo_dir: os.PathLike[str], env: Environment) -> Path:
     """Determine which child directory of ``repo_dir`` is the project template.
 

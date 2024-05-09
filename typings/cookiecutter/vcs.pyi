@@ -8,10 +8,7 @@ from typing import Optional
 """Helper functions for working with version control systems."""
 logger = ...
 BRANCH_ERRORS = ...
-
-def identify_repo(
-    repo_url,
-):  # -> tuple[Any, Any] | tuple[Literal['git'], Any] | tuple[Literal['hg'], Any]:
+def identify_repo(repo_url): # -> tuple[Any, Any] | tuple[Literal['git'], Any] | tuple[Literal['hg'], Any]:
     """Determine if `repo_url` should be treated as a URL to a git or hg repo.
 
     Repos can be identified by prepending "hg+" or "git+" to the repo URL.
@@ -21,7 +18,7 @@ def identify_repo(
     """
     ...
 
-def is_vcs_installed(repo_type):  # -> bool:
+def is_vcs_installed(repo_type): # -> bool:
     """
     Check if the version control system for a repo type is installed.
 
@@ -29,12 +26,7 @@ def is_vcs_installed(repo_type):  # -> bool:
     """
     ...
 
-def clone(
-    repo_url: str,
-    checkout: Optional[str] = ...,
-    clone_to_dir: os.PathLike[str] = ...,
-    no_input: bool = ...,
-):  # -> str:
+def clone(repo_url: str, checkout: Optional[str] = ..., clone_to_dir: os.PathLike[str] = ..., no_input: bool = ...): # -> str:
     """Clone a repo to the current directory.
 
     :param repo_url: Repo URL of unknown type.
