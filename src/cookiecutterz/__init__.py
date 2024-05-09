@@ -22,20 +22,20 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from cookiecutter import generate, hooks
-from cookiecutter.generate import (
-    _run_hook_from_repo_dir,  # pyright: ignore[reportAttributeAccessIssue]
-    generate_file,
-)
-from cookiecutter.hooks import run_hook
+from cookiecutter.generate import generate_file
+from cookiecutter.hooks import run_hook, run_pre_prompt_hook
 
 from cookiecutterz._version import __version__
 from cookiecutterz.extensions import (
-    install_inherited,
-    load_inherited_templates,
+    Master,
+    install_inherited_templates,
+    load_inherited_jinja_templates,
 )
 
 
 if TYPE_CHECKING:
+    import os
+
     import jinja2
 
 __all__ = ["__version__"]
@@ -64,45 +64,40 @@ def uncache(exclude: list[str]) -> None:
 
 
 # MONKEY PATCHING COOKIECUTTER
-def __run_hook_from_repo_dir(
-    repo_dir: str,
+def run_hook_patched(
     hook_name: str,
     project_dir: str,
     context: dict[str, Any],
-    delete_project_on_failure: bool,
 ) -> None:
-    """Hook for registering cwd for further update of project."""
-    if hook_name == "pre_gen_project":
+    """Main entry point in template generation process."""
+    if hook_name == "post_gen_project":
+        run_hook(hook_name, project_dir, context)
+    elif hook_name == "pre_gen_project":
         context["cookiecutter"]["_cwd"] = str(Path.cwd())
-    _run_hook_from_repo_dir(
-        repo_dir,
-        hook_name,
-        project_dir,
-        context,
-        delete_project_on_failure,
-    )
+        run_hook(hook_name, project_dir, context)
+        install_inherited_templates(project_dir, context)
 
 
-def _run_hook(hook_name: str, project_dir: str, context: dict[str, Any]) -> None:
-    """Hook for installing inherited templates if provided."""
-    run_hook(hook_name, project_dir, context)
-    if hook_name == "pre_gen_project":
-        install_inherited(project_dir, context)
+def run_pre_prompt_hook_patched(repo_dir: os.PathLike[str]) -> Path:
+    work_dir: Path = run_pre_prompt_hook(repo_dir)
+    master = Master(repo=Path(repo_dir), work_dir=Path(work_dir))
+    return master.work_dir
 
 
-def _generate_file(
+def generate_file_patched(
     project_dir: str,
     infile: str,
     context: dict[str, Any],
     env: jinja2.Environment,
     skip_if_file_exists: bool = False,
 ):
-    """Hook for loading inherited jinja templates in jinja environment."""
-    env = load_inherited_templates(context, env)
+    """Patch for loading inherited jinja templates in jinja environment."""
+    env = load_inherited_jinja_templates(context, env)
     generate_file(project_dir, infile, context, env, skip_if_file_exists)
 
 
-generate._run_hook_from_repo_dir = __run_hook_from_repo_dir  # pyright: ignore[reportAttributeAccessIssue]
-hooks.run_hook = _run_hook
-generate.generate_file = _generate_file
+# Applying patched functions
+hooks.run_pre_prompt_hook = run_pre_prompt_hook_patched
+hooks.run_hook = run_hook_patched
+generate.generate_file = generate_file_patched
 uncache(["cookiecutter.hooks", "cookiecutter.generate"])

@@ -39,7 +39,9 @@ def run(*args: str, capture: bool = False, **kwargs: Any) -> str:
     return cp.stdout or ""
 
 
-TEST_TEMPLATE = "https://github.com/audreyfeldroy/cookiecutter-pypackage"
+# TEST_TEMPLATE = "https://github.com/testdrivenio/cookiecutter-flask-skeleton"
+# TEST_TEMPLATE = "https://github.com/audreyfeldroy/cookiecutter-pypackage"
+TEST_TEMPLATE = Path.home() / "DEV/REPOS/cookiecutter_pep_517"
 
 
 #
@@ -93,8 +95,10 @@ def test_pdm_create(tmp_dir: Path, extra_context: dict[str, str]) -> None:
     )
 
 
+# should run on template with missing pre_gen_hook
 # should forbid circular dependencies between templates
 # template dont have to overload input field of ancestor
 # template could overload input field of ancestor
 # template do not need to redefined _copy_without_render dict of ancestor
 # template could have multiples inheritance
+# template could inherite from an unaware cookicutterz template
