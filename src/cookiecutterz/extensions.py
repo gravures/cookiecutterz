@@ -77,18 +77,20 @@ class Master:
     _inspected: ClassVar[bool] = False
     name: ClassVar[str]
     template: ClassVar[Master.Template]
-    ancestors: ClassVar[OrderedDict[str, Master.Template]] = OrderedDict()
+    __TRO__: ClassVar[OrderedDict[str, Master.Template]] = OrderedDict()
     work_dir: ClassVar[Path]
 
     def __new__(cls, *, repo: Path | None = None, work_dir: Path | None = None) -> Master:  # noqa: D102
         if cls._instance is None:
+            # code in this scope will execute once by cookiecutter session
+            # at the pre_prompt stage
             if repo is None:
                 raise TypeError
             cls._instance = super().__new__(cls)
             cls.name = repo.stem
             cls.work_dir = work_dir or repo
             cls.template = Master.Template(url=None, repo=repo, cookiecutter={})
-            cls._instance._inspect()
+            cls._instance.prepare()
         return cls._instance
 
     @staticmethod
@@ -106,49 +108,67 @@ class Master:
             json.dump(cooikecutter, stream, indent=2)
 
     @classmethod
-    def _inspect(cls) -> None:
+    def prepare(cls) -> None:
+        """Inspect and prepare the master template.
+
+        This function is executed as a pre_prompt hook for the master template.
+        It will run after any real pre_prompt hook and before any prompts will
+        be sent to the user.
+        """
         if Master._inspected:
             return
 
         cls.template.cookiecutter = cls.import_cookiecutter(repo=cls.work_dir)
+        if cls.template.cookiecutter.get("_bases"):
+            cls.work_dir = (
+                cls.work_dir
+                if cls.work_dir != cls.template.repo
+                else create_tmp_repo_dir(cls.template.repo)
+            )
+            cls.template.cookiecutter.setdefault("__prompts__", {})
+            cls.template.cookiecutter.setdefault("_copy_without_render", [])
 
-        # TODO: should be recursive through the hierarchy
-        #       here we only go one level deep in inheritance
-        if extends := cls.template.cookiecutter.get("_extends"):
-            cc_master = cls.template.cookiecutter
-            if cls.work_dir == cls.template.repo:
-                cls.work_dir = create_tmp_repo_dir(cls.template.repo)
-                print(f"DEBUG: {cls.work_dir}")
-
-            if not cc_master.get("__prompts__"):
-                cc_master["__prompts__"] = {}
-            if not cc_master.get("_copy_without_render"):
-                cc_master["_copy_without_render"] = []
-
-            # template could have multiples inheritance
-            for ancestor in extends:
-                name = cls.register(url=ancestor)
-                cc_ancestor = cls.ancestors[name].cookiecutter
-
-                # template dont have to overload input field of ancestors.
-                # forward them if not defined in master template
-                for k, v in get_public_keys(cc_ancestor).items():
-                    if k not in cc_master:
-                        cls.template.cookiecutter[k] = v
-                        if cc_ancestor.get("__prompts__", {}).get(k):
-                            cc_master["__prompts__"][k] = cc_ancestor["__prompts__"][k]
-
-                # forwards _copy_without_render dict from ancestors.
-                for v in cc_ancestor.get("_copy_without_render", []):
-                    if v not in cc_master["_copy_without_render"]:
-                        cc_master["_copy_without_render"].append(v)  # pyright: ignore [reportUnknownMemberType]
+            cls.inspect_template(cls.template)
 
             # export merged cookiecutter mapping to json in place of original
             cls.export_cookiercutter(repo=cls.work_dir, cooikecutter=cls.template.cookiecutter)
+
         Master._inspected = True
 
+    @classmethod
+    def inspect_template(cls, template: Template) -> None:
+        """Inspect template and populate base templates."""
+        if not (bases := cast(list[str], template.cookiecutter.get("_bases"))):
+            return
+
+        # template could have multiples inheritance
+        for base_t in bases:
+            name = cls.register(url=base_t)
+            cc_master = cls.template.cookiecutter
+            cc_base = cls.__TRO__[name].cookiecutter
+
+            # recursively inspect hierarchy
+            cls.inspect_template(cls.__TRO__[name])
+
+            # Assure proper Template Resolution Order
+            cls.__TRO__.move_to_end(name, last=True)
+
+            # Forward them if not defined in master template
+            for k, v in cls.get_public_keys(cc_base).items():
+                cc_master.setdefault(k, v)
+                if "__prompts__" in cc_base and k in cc_base["__prompts__"]:
+                    cc_master["__prompts__"].setdefault(k, cc_base["__prompts__"][k])
+
+            # Forwards _copy_without_render list from base templates using set operations
+            cc_master["_copy_without_render"] = list(
+                set(cc_master["_copy_without_render"]).union(
+                    cc_base.get("_copy_without_render", [])
+                )
+            )
+
     @staticmethod
-    def _template_from_url(url: str) -> Template:
+    def template_from_url(url: str) -> Template:
+        """Return Template instance from remote/local url."""
         user_config: dict[str, Any] = config.get_user_config()  # pyright: ignore [reportUnknownMemberType]
         # clone the inherited template locally
         # or use it if it's already a directory
@@ -171,65 +191,65 @@ class Master:
         We check against repo.stem because repo could be a tmp copy
         of a genuine repo (see: run_pre_prompt_hook()).
         """
-        tmpl = cls._template_from_url(url)
+        # NOTE: this implies the limation of forbid different template
+        #       (eg: frm different authors and diifferent url) resolving
+        #       to the same name
+        tmpl = cls.template_from_url(url)
         name: str = tmpl.repo.stem
-        if name == cls.name or (cls.ancestors and name in cls.ancestors):
+        if name == cls.name or (cls.__TRO__ and name in cls.__TRO__):
             raise CircularInheritanceException
-        cls.ancestors[name] = tmpl
+        cls.__TRO__[name] = tmpl
         return name
 
-    @classmethod
-    def update(cls, name: str, key: str, value: Any) -> None:
-        """Update a value of a registered template."""
-        if key == "repo" and Path(value).stem != name:
-            raise TypeError
-        setattr(cls.ancestors[name], key, value)
+    @staticmethod
+    def get_public_keys(context: dict[str, Any]) -> dict[str, Any]:
+        """Filter out private keys from a context."""
+        return {k: v for k, v in context.items() if not k.startswith("_")}
 
+    @staticmethod
+    def load_inherited_jinja_templates(
+        context: dict[str, Any], env: jinja2.Environment
+    ) -> jinja2.Environment:
+        """Load inherited jinja templates in jinja environment."""
+        if jinja_base_templates := context.get("cookiecutter", {}).get(
+            "_jinja_base_templates",
+            [],
+        ):
+            env.loader = jinja2.FileSystemLoader([".", "../templates", *jinja_base_templates])
+        return env
 
-def get_public_keys(context: dict[str, Any]) -> dict[str, Any]:
-    """Filter out private keys from a context."""
-    return {k: v for k, v in context.items() if not k.startswith("_")}
+    def install_inherited_templates(self, project_dir: str, context: dict[str, Any]) -> None:
+        """Install inherited cookiecutter templates.
 
+        This function is call as a pre_gen_project hook and after
+        any real pre_gen_project hook. It will be called for any template
+        expansion, including base templates installation triggered by this
+        function.
+        """
+        if not self.__TRO__:
+            return
 
-def load_inherited_jinja_templates(
-    context: dict[str, Any], env: jinja2.Environment
-) -> jinja2.Environment:
-    """Load inherited jinja templates in jinja environment."""
-    if ancestors_templates := context.get("cookiecutter", {}).get(
-        "_ancestors_templates",
-        [],
-    ):
-        env.loader = jinja2.FileSystemLoader([".", "../templates", *ancestors_templates])
-    return env
+        pprint(f"DEBUG INSTALL: {context}")
+        # public_keys: dict[str, Any] = get_public_keys(self.template.cookiecutter)
 
+        jinja_templates: list[str] = []
+        for ancestor in self.__TRO__.values():
+            # jinja templates from inherited cookiecutter
+            templates_dir = ancestor.repo / "templates"
+            if templates_dir.is_dir():
+                jinja_templates.append(str(templates_dir))
 
-def install_inherited_templates(project_dir: str, context: dict[str, Any]) -> None:
-    """Install inherited cookiecutter templates."""
-    master: Master = Master()
-    if not master.ancestors:
-        return
+            # generate project from inherited cookiecutter
+            # overwriting files if necessary
+            main.cookiecutter(  # pyright: ignore[reportUnknownMemberType]
+                template=ancestor.repo,
+                no_input=True,
+                # extra_context=public_keys,
+                output_dir=str(Path(project_dir).parent),
+                accept_hooks=True,
+                overwrite_if_exists=True,
+                skip_if_file_exists=False,
+            )
 
-    pprint(f"DEBUG INSTALL: {context}")
-    # public_keys: dict[str, Any] = get_public_keys(master.template.cookiecutter)
-
-    jinja_templates: list[str] = []
-    for ancestor in master.ancestors.values():
-        # jinja templates from inherited cookiecutter
-        templates_dir = ancestor.repo / "templates"
-        if templates_dir.is_dir():
-            jinja_templates.append(str(templates_dir))
-
-        # generate project from inherited cookiecutter
-        # overwriting files if necessary
-        main.cookiecutter(  # pyright: ignore[reportUnknownMemberType]
-            template=ancestor.repo,
-            no_input=True,
-            # extra_context=public_keys,
-            output_dir=str(Path(project_dir).parent),
-            accept_hooks=True,
-            overwrite_if_exists=True,
-            skip_if_file_exists=False,
-        )
-
-    if jinja_templates:
-        context["cookiecutter"]["_ancestors_templates"] = jinja_templates
+        if jinja_templates:
+            context["cookiecutter"]["_jinja_base_templates"] = jinja_templates

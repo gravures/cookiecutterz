@@ -26,11 +26,7 @@ from cookiecutter.generate import generate_file
 from cookiecutter.hooks import run_hook, run_pre_prompt_hook
 
 from cookiecutterz._version import __version__
-from cookiecutterz.extensions import (
-    Master,
-    install_inherited_templates,
-    load_inherited_jinja_templates,
-)
+from cookiecutterz.extensions import Master
 
 
 if TYPE_CHECKING:
@@ -75,7 +71,8 @@ def run_hook_patched(
     elif hook_name == "pre_gen_project":
         context["cookiecutter"]["_cwd"] = str(Path.cwd())
         run_hook(hook_name, project_dir, context)
-        install_inherited_templates(project_dir, context)
+        master = Master()
+        master.install_inherited_templates(project_dir, context)
 
 
 def run_pre_prompt_hook_patched(repo_dir: os.PathLike[str]) -> Path:
@@ -92,7 +89,8 @@ def generate_file_patched(
     skip_if_file_exists: bool = False,
 ):
     """Patch for loading inherited jinja templates in jinja environment."""
-    env = load_inherited_jinja_templates(context, env)
+    master = Master()
+    env = master.load_inherited_jinja_templates(context, env)
     generate_file(project_dir, infile, context, env, skip_if_file_exists)
 
 
