@@ -20,19 +20,20 @@ from __future__ import annotations
 import json
 import shutil
 import tempfile
-from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
-from pprint import pprint
 from typing import TYPE_CHECKING, Any, ClassVar, cast, final
 
 import jinja2
 from cookiecutter import config, main, repository
 from cookiecutter.exceptions import CookiecutterException
 
+from cookiecutterz.collections import NewOrderedDict
+
 
 if TYPE_CHECKING:
     import os
+    from collections import OrderedDict
 
 
 # TODO: report a bug to cooikecutter team
@@ -71,13 +72,14 @@ class Master:
 
         repo: Path
         url: str | None
-        cookiecutter: dict[str, Any]
+        cookiecutter: NewOrderedDict[str, Any]
 
     _instance: ClassVar[Master | None] = None
     _inspected: ClassVar[bool] = False
+    _safe_guard: ClassVar[int]
     name: ClassVar[str]
     template: ClassVar[Master.Template]
-    __TRO__: ClassVar[OrderedDict[str, Master.Template]] = OrderedDict()
+    __TRO__: ClassVar[NewOrderedDict[str, Master.Template]] = NewOrderedDict()
     work_dir: ClassVar[Path]
 
     def __new__(cls, *, repo: Path | None = None, work_dir: Path | None = None) -> Master:  # noqa: D102
@@ -87,21 +89,22 @@ class Master:
             if repo is None:
                 raise TypeError
             cls._instance = super().__new__(cls)
+            cls._safe_guard = 0
             cls.name = repo.stem
             cls.work_dir = work_dir or repo
-            cls.template = Master.Template(url=None, repo=repo, cookiecutter={})
+            cls.template = Master.Template(url=None, repo=repo, cookiecutter=NewOrderedDict())
             cls._instance.prepare()
         return cls._instance
 
     @staticmethod
-    def import_cookiecutter(repo: Path) -> dict[str, Any]:
+    def import_cookiecutter(repo: Path) -> NewOrderedDict[str, Any]:
         """Return cookiecutter.json content as a dictionary."""
         cc_json = repo / "cookiecutter.json"
         with cc_json.open("r") as stream:
-            return json.loads(stream.read())
+            return NewOrderedDict(json.loads(stream.read()))
 
     @staticmethod
-    def export_cookiercutter(repo: Path, cooikecutter: dict[str, Any]) -> None:
+    def export_cookiercutter(repo: Path, cooikecutter: OrderedDict[str, Any]) -> None:
         """Export cookiecutter.json content from dictionary."""
         cc_json = repo / "cookiecutter.json"
         with cc_json.open("w") as stream:
@@ -125,14 +128,15 @@ class Master:
                 if cls.work_dir != cls.template.repo
                 else create_tmp_repo_dir(cls.template.repo)
             )
-            cls.template.cookiecutter.setdefault("__prompts__", {})
             cls.template.cookiecutter.setdefault("_copy_without_render", [])
+            cls.template.cookiecutter.setdefault("__prompts__", {})
 
             cls.inspect_template(cls.template)
 
             # export merged cookiecutter mapping to json in place of original
+            # cls.template.cookiecutter._debug()
             cls.export_cookiercutter(repo=cls.work_dir, cooikecutter=cls.template.cookiecutter)
-
+            # print(f"\n{json.dumps(cls.template.cookiecutter, indent=2)}")
         Master._inspected = True
 
     @classmethod
@@ -147,15 +151,23 @@ class Master:
             cc_master = cls.template.cookiecutter
             cc_base = cls.__TRO__[name].cookiecutter
 
-            # recursively inspect hierarchy
+            # recursively inspect bases template hierarchy
             cls.inspect_template(cls.__TRO__[name])
 
-            # Assure proper Template Resolution Order
+            # Assure proper Templates Resolution Order
             cls.__TRO__.move_to_end(name, last=True)
 
-            # Forward them if not defined in master template
+            # Forward input fields if not defined in master template
+            _curr: str = cc_master.first
             for k, v in cls.get_public_keys(cc_base).items():
-                cc_master.setdefault(k, v)
+                # Assure bases keys are first
+                # cc_master.setdefault(k, v)
+                if k in cc_master:
+                    _curr = k
+                    continue
+                cc_master.after(k, _curr, v)
+                _curr = k
+                # add prompt value if exists (order does not matter)
                 if "__prompts__" in cc_base and k in cc_base["__prompts__"]:
                     cc_master["__prompts__"].setdefault(k, cc_base["__prompts__"][k])
 
@@ -185,7 +197,7 @@ class Master:
 
     @classmethod
     def register(cls, url: str) -> str:
-        """Register a template as ancestor.
+        """Register a template as a base template..
 
         Avoid circular inheritance in a very restrictive way.
         We check against repo.stem because repo could be a tmp copy
@@ -226,30 +238,35 @@ class Master:
         expansion, including base templates installation triggered by this
         function.
         """
-        if not self.__TRO__:
+        self.__class__._safe_guard += 1
+        # Safe guard preventing recursive expansion of base template
+        if self._safe_guard > 1 or not self.__TRO__:
             return
 
-        pprint(f"DEBUG INSTALL: {context}")
-        # public_keys: dict[str, Any] = get_public_keys(self.template.cookiecutter)
-
+        # Get the user input from the master template provided by cookecutter
+        # print(f"DEBUG INSTALL: {context}")
+        cc_input: dict[str, Any] = context.get("cookiecutter", {})
+        public_keys: dict[str, Any] = self.get_public_keys(cc_input)
         jinja_templates: list[str] = []
-        for ancestor in self.__TRO__.values():
-            # jinja templates from inherited cookiecutter
-            templates_dir = ancestor.repo / "templates"
+
+        # Expands base templates using our Template Resolution Order
+        for base_t in self.__TRO__.values():
+            # collect jinja templates from inherited cookiecutter
+            templates_dir = base_t.repo / "templates"
             if templates_dir.is_dir():
                 jinja_templates.append(str(templates_dir))
 
-            # generate project from inherited cookiecutter
-            # overwriting files if necessary
+            # expands overwriting files if necessary
             main.cookiecutter(  # pyright: ignore[reportUnknownMemberType]
-                template=ancestor.repo,
+                template=str(base_t.repo),
                 no_input=True,
-                # extra_context=public_keys,
+                extra_context=public_keys,
                 output_dir=str(Path(project_dir).parent),
                 accept_hooks=True,
                 overwrite_if_exists=True,
                 skip_if_file_exists=False,
             )
 
+        # Register base jina templates for final master expansion
         if jinja_templates:
             context["cookiecutter"]["_jinja_base_templates"] = jinja_templates
