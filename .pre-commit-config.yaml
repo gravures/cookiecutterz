@@ -11,12 +11,11 @@ repos:
         stages: [commit-msg]
         args: []
   # Words spelling
-  - repo: https://github.com/codespell-project/codespell
-    rev: v2.2.6
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.21.0
     hooks:
-      - id: codespell
-        args: [--skip='*.po']
-        exclude: ^tests/
+      - id: typos
+        args: []
   # Pre-commit hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
