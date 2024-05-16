@@ -128,11 +128,11 @@ class NewOrderedDict(_OrderedDict, dict[_KT, _VT]):
         elif self._insert(key=key, value=value, _from=other):
             self._move_key(key=key, other=other, before=True)
 
-    def _debug(self) -> None:
-        _map: dict[str, _Link[_KT]] = getattr(self, "_OrderedDict__map")  # noqa: B009
-        print("\nDEBUG:")
-        for v in _map.values():
-            print(
+    def _debug(self) -> str:
+        return "\n".join([
+            (
                 f"key:{v.key}, prev:{getattr(v.prev, 'key', 'root')}"
                 f", next:{getattr(v.next, 'key', 'root')}"
             )
+            for v in self.__map.values()
+        ])

@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -34,6 +35,8 @@ from cookiecutterz.collections import NewOrderedDict
 if TYPE_CHECKING:
     import os
     from collections import OrderedDict
+
+logger = logging.getLogger(__name__)
 
 
 # TODO: report a bug to cooikecutter team
@@ -134,9 +137,9 @@ class Master:
             cls.inspect_template(cls.template)
 
             # export merged cookiecutter mapping to json in place of original
-            # cls.template.cookiecutter._debug()
+            logger.debug(cls.template.cookiecutter._debug())
             cls.export_cookiercutter(repo=cls.work_dir, cooikecutter=cls.template.cookiecutter)
-            # print(f"\n{json.dumps(cls.template.cookiecutter, indent=2)}")
+            logger.debug(f"\n{json.dumps(cls.template.cookiecutter, indent=2)}")  # noqa: G004
         Master._inspected = True
 
     @classmethod
