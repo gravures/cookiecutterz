@@ -66,7 +66,7 @@ class CircularInheritanceException(CookiecutterException):
 class Master:
     """Singleton Template Master class."""
 
-    @dataclass(slots=True, kw_only=True)
+    @dataclass()
     class Template:
         """Template data."""
 
