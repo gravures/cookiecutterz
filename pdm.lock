@@ -5,7 +5,7 @@
 groups = ["default", "dev", "test"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:5ebcd02ab4e4660bb216e23b7527fd20966c0ab418a0db3f6a3e9e38434cb967"
+content_hash = "sha256:5ed2960d0664265aaedf7225bb886b922f2696504d60a389e160705339551469"
 
 [[package]]
 name = "anyio"
@@ -967,6 +967,19 @@ dependencies = [
 files = [
     {file = "pre_commit-3.7.0-py2.py3-none-any.whl", hash = "sha256:5eae9e10c2b5ac51577c3452ec0a490455c45a0533f7960f993a0d01e59decab"},
     {file = "pre_commit-3.7.0.tar.gz", hash = "sha256:e209d61b8acdcf742404408531f0c37d49d2c734fd7cff2d6076083d191cb060"},
+]
+
+[[package]]
+name = "pretty-errors"
+version = "1.2.25"
+summary = "Prettifies Python exception output to make it legible."
+groups = ["dev"]
+dependencies = [
+    "colorama",
+]
+files = [
+    {file = "pretty_errors-1.2.25-py3-none-any.whl", hash = "sha256:8ce68ccd99e0f2a099265c8c1f1c23b7c60a15d69bb08816cb336e237d5dc983"},
+    {file = "pretty_errors-1.2.25.tar.gz", hash = "sha256:a16ba5c752c87c263bf92f8b4b58624e3b1e29271a9391f564f12b86e93c6755"},
 ]
 
 [[package]]

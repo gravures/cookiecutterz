@@ -40,7 +40,7 @@ build-backend = "pdm.backend"
 
 [tool.pdm]
 distribution = true
-plugins      = ["-e file:///${PROJECT_ROOT}"]
+plugins = ["-e file:///${PROJECT_ROOT}"]
 
 [project.entry-points.pdm]
 pdm-cruft = "cookiecutterz.pdm:main"
@@ -52,22 +52,24 @@ write_template = "__version__ = '{}'"
 
 [tool.pdm.dev-dependencies]
 dev = [
-  "ruff==0.4.1",
-  "basedpyright==1.10.3",
-  "pre-commit==3.7.0",
-  "tox-pdm>=0.7.2",
-  "dead>=1.5.2",
+    "ruff==0.4.1",
+    "basedpyright==1.10.3",
+    "pre-commit==3.7.0",
+    "tox-pdm>=0.7.2",
+    "dead>=1.5.2",
+    "pretty-errors>=1.2.25",
 ]
 test = ["pytest", "hypothesis", "coverage[toml]", "tox>=4.0"]
 
 [tool.pdm.scripts]
+traceback   = "_traceback.py"
 xrequire    = "pdm export -f requirements -o requirements.txt"
 test        = "pytest -s -v -k {args}"
 test_all    = "coverage run -m pytest"
 test_typing = "pdm run basedpyright --stats ./src/cookiecutterz"
 test_cover  = "coverage report"
 tox_testme  = "tox --develop -r -e py"
-pc_init     = "pre-commit install"
+pc_init     = "pre-commit install --install-hooks"
 pc_update   = "pre-commit autoupdate"
 pc_check    = { env = { "SKIP" = "basedpyright" }, cmd = "pre-commit run --all-files" }
 dead        = "dead"
