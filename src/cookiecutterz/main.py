@@ -17,13 +17,19 @@
 
 from __future__ import annotations
 
+import sys
+
 from click import secho
 from cookiecutter.cli import main as _main
 
 
 def main():  # noqa: D103
-    secho("This a cookiecutter(z) program version with template extension feature.", fg="green")
+    secho(
+        "This a cookiecutter(z) program version with template extension feature.",
+        fg="green",
+    )
     secho("")
+    sys.argv.append("--overwrite-if-exists")
     _main()
 
 

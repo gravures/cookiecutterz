@@ -21,18 +21,18 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from cookiecutter import generate, hooks
-from cookiecutter.generate import generate_file
+from cookiecutter import hooks, prompt, utils
 from cookiecutter.hooks import run_hook, run_pre_prompt_hook
 
 from cookiecutterz._version import __version__
-from cookiecutterz.extensions import Master
+from cookiecutterz.inheritance import Master, SharedEnvironment
 
 
 if TYPE_CHECKING:
     import os
 
     import jinja2
+
 
 __all__ = ["__version__"]
 
@@ -69,7 +69,6 @@ def run_hook_patched(
     if hook_name == "post_gen_project":
         run_hook(hook_name, project_dir, context)
     elif hook_name == "pre_gen_project":
-        context["cookiecutter"]["_cwd"] = str(Path.cwd())
         run_hook(hook_name, project_dir, context)
         master = Master()
         master.install_inherited_templates(project_dir, context)
@@ -78,24 +77,27 @@ def run_hook_patched(
 def run_pre_prompt_hook_patched(repo_dir: os.PathLike[str]) -> Path:
     work_dir: Path = run_pre_prompt_hook(repo_dir)
     master = Master(repo=Path(repo_dir), work_dir=Path(work_dir))
-    return master.work_dir
+    return master.template.repo
 
 
-def generate_file_patched(
-    project_dir: str,
-    infile: str,
-    context: dict[str, Any],
-    env: jinja2.Environment,
-    skip_if_file_exists: bool = False,
-):
-    """Patch for loading inherited jinja templates in jinja environment."""
+def create_env_with_context_patched(context: dict[str, Any]) -> jinja2.Environment:
+    """Patch for updating jinja environment with inherited templates.
+
+    Create a jinja environment using the provided context.
+    """
     master = Master()
-    env = master.load_inherited_jinja_templates(context, env)
-    generate_file(project_dir, infile, context, env, skip_if_file_exists)
+    env_vars = context.get("cookiecutter", {}).get("_jinja2_env_vars", {})
+    env = SharedEnvironment(
+        keep_trailing_newline=True,
+        **env_vars,
+    )
+    return master.update_jinja_environment(env, context)
 
 
 # Applying patched functions
 hooks.run_pre_prompt_hook = run_pre_prompt_hook_patched
 hooks.run_hook = run_hook_patched
-generate.generate_file = generate_file_patched
-uncache(["cookiecutter.hooks", "cookiecutter.generate"])
+prompt.create_env_with_context = create_env_with_context_patched  # pyright: ignore[reportAttributeAccessIssue]
+hooks.create_env_with_context = create_env_with_context_patched  # pyright: ignore[reportAttributeAccessIssue]
+utils.create_env_with_context = create_env_with_context_patched
+uncache(["cookiecutter.hooks", "cookiecutter.utils", "cookiecutter.prompt"])
