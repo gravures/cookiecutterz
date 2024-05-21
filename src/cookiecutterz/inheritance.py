@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, NewType, cast, final
 from cookiecutter import config, main, repository
 from cookiecutter.exceptions import CookiecutterException, UnknownExtension
 from cookiecutter.utils import work_in
-from jinja2 import Environment, StrictUndefined
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from cookiecutterz.ecollections import NewOrderedDict
 
@@ -264,8 +264,8 @@ class Master:
             )
             self.template.cookiecutter.setdefault("_copy_without_render", [])
             self.template.cookiecutter.setdefault("__prompts__", {})
-            self.register_jinja_extensions(self.template)
-            self.inspect_template(self.template)
+            self._register_jinja_extensions(self.template)
+            self._inspect_template(self.template)
 
             # export merged cookiecutter mapping to json in place of original
             self.template.export_cookiercutter()
@@ -275,19 +275,19 @@ class Master:
         self.stage = "inspected"
         self.current = self.template.name
 
-    def inspect_template(self, template: Template) -> None:
+    def _inspect_template(self, template: Template) -> None:
         """Inspect template and populate base templates."""
         if not (bases := cast(list[str], template.cookiecutter.get("_bases"))):
             return
 
         # template could have multiples inheritance
         for base_t in bases:
-            base = self.register_template(url=base_t)
+            base = self._register_template(url=base_t)
             cc_master = self.template.cookiecutter
             cc_base = base.cookiecutter
 
             # recursively inspect bases template hierarchy
-            self.inspect_template(base)
+            self._inspect_template(base)
 
             # Assure proper Templates Resolution Order
             self.__tro__.move_to_end(base.name, last=True)
@@ -314,25 +314,9 @@ class Master:
             )
 
             # Register jinja environment
-            self.register_jinja_extensions(base)
+            self._register_jinja_extensions(base)
 
-    def register_jinja_extensions(self, template: Template) -> None:
-        """Registers Jinja templates directory and extensions."""
-        # templates
-        if (tmp := template.repo / "templates").is_dir():
-            self.jinja_templates.add(str(tmp))
-
-        # extensions
-        self.jinja_extensions[template.name] = set()
-        for ext in template.cookiecutter.get("_extensions", []):
-            _p = ext.split(".")
-            if (mod := loads_module(_p[0], template.repo)) and (
-                _ext := getattr(mod, _p[-1], None)
-            ):
-                self.jinja_extensions[template.name].add(_ext)
-        logger.log(LOG_LEVEL, "registering jinja extensions %s", self.jinja_extensions)
-
-    def register_template(self, url: str) -> Template:
+    def _register_template(self, url: str) -> Template:
         """Register a template as a base template..
 
         Avoid circular inheritance in a very restrictive way.
@@ -349,18 +333,32 @@ class Master:
         self.__tro__[tmpl.name] = tmpl
         return tmpl
 
-    @staticmethod
-    def get_public_keys(context: dict[str, Any]) -> dict[str, Any]:
-        """Filter out private keys from a context."""
-        return {k: v for k, v in context.items() if not k.startswith("_")}
+    def _register_jinja_extensions(self, template: Template) -> None:
+        """Registers Jinja templates directory and extensions."""
+        # register jinja template directory globally
+        if (tmp := template.repo / "templates").is_dir():
+            self.jinja_templates.add(str(tmp))
+
+        # register extensions for each template
+        self.jinja_extensions[template.name] = set()
+        for ext in template.cookiecutter.get("_extensions", []):
+            _p = ext.split(".")
+            if (mod := loads_module(_p[0], template.repo)) and (
+                _ext := getattr(mod, _p[-1], None)
+            ):
+                self.jinja_extensions[template.name].add(_ext)
+        logger.log(LOG_LEVEL, "registering jinja extensions %s", self.jinja_extensions)
 
     def update_jinja_environment(self, env: Environment, context: dict[str, Any]) -> Environment:  # noqa: ARG002
-        """Update the jinja environment with necessary inherited properties."""
+        """Update the jinja environment with inherited extensions and templates."""
         if env is self._cached_jinja_environments[self.template.name]:
             for n, exts in self.jinja_extensions.items():
                 if n != self.template.name:
                     for e in exts:
                         env.add_extension(e)
+            if self.jinja_templates:
+                env.loader = FileSystemLoader([".", "../templates", *self.jinja_templates])
+
             logger.log(
                 LOG_LEVEL,
                 "<%s>: Updating the jinja environment (%s) with %s and %s",
@@ -370,6 +368,11 @@ class Master:
                 self.jinja_templates,
             )
         return env
+
+    @staticmethod
+    def get_public_keys(context: dict[str, Any]) -> dict[str, Any]:
+        """Filter out private keys from a context."""
+        return {k: v for k, v in context.items() if not k.startswith("_")}
 
     def install_inherited_templates(self, project_dir: str, context: dict[str, Any]) -> None:
         """Install inherited cookiecutter templates.
