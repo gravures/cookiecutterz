@@ -18,77 +18,12 @@ skip-magic-trailing-comma = false
 preview = true
 task-tags = ["TODO", "FIXME", "BUG", "HACK", "XXX", "[ ]", "[*]"]
 unfixable = ["F401"] # Disable fix for unused imports (`F401`)
-select = [
-  # 'ANN',   # flake8-annotations
-  'C9',    # mccabe
-  'D',     # pydocstyle
-  'E',     # Error
-  'W',     # Warnings
-  'R',     # refactor
-  'F',     # pyflakes
-  'I',     # isort
-  'N',     # pep8-naming
-  'DJ',    # flake8-django
-  'A',     # flake8-builtins
-  'B',     # flake8-bugbear
-  'C4',    # flake8-comprehensions
-  'ARG',   # flake8-unused-arguments
-  'ASYNC', # flake8-async
-  'BLE',   # flake8-blind-except
-  'S',     # flake8-bandit
-  'FBT',   # flake8-boolean-trap
-  'COM',   # flake8-commas
-  'CPY',   # flake8-copyright
-  'DTZ',   # flake8-datetimez
-  'EM',    # flake8-errmsg
-  'EXE',   # flake8-executable
-  'FIX',   # flake8-fixme
-  'FA',    # flake8-future-annotations
-  'ISC',   # flake8-implicit-str-concat
-  'ICN',   # flake8-import-conventions
-  'INP',   # flake8-no-pep420
-  'INT',   # flake8-gettext
-  'LOG',   # flake8-logging
-  'G',     # flake8-logging-format
-  'PIE',   # flake8-pie
-  'PT',    # flake8-pytest-style
-  'PYI',   # flake8-pyi
-  'RSE',   # flake8-raise
-  'RET',   # flake8-return
-  'SIM',   # flake8-simplify
-  'SLF',   # flake8-self
-  'SLOT',  # flake8-slots
-  'TCH',   # flake8-type-checking
-  'TD',    # flake8-todo
-  'TID',   # flake8-tidy-imports
-  'T10',   # flake8-debugger
-  'T20',   # flake8-print
-  'TRIO',  # flake8-trio
-  'PTH',   # flake8-use-pathlib
-  'Q',     # flake8-quotes
-  'YTT',   # flake8-2020
-  'PL',    # pylint
-  'TRY',   # tryceratops
-  'RUF',   # ruff
-  'ERA',   # eradicate
-  'UP',    # pyupgrade
-  'PGH',   # pygrep-hooks
-  'FLY',   # flynt
-  'NPY',   # NumPy-specific rules
-  'AIR',   # Airflow
-  'PERF',  # perflint
-  'FURB',  # refuurb
-  # 'PD',    # panda-vet
-]
-
+select = ['ALL']
 ignore = [
-  'COM812', # missing trailing comma
-  'COM819', # prohibited-trailing-comma
-  # 'D100',    # undocumented-public-module
-  # 'D101',    # undocumented-public-class
-  # 'D102',    # undocumented-public-method
-  # 'D103',    # undocumented-public-function
-  # 'D104',    # undocumented-public-package
+  'ANN',     # flake8-annotations
+  'PD',      # panda-vet
+  'COM812',  # missing trailing comma
+  'COM819',  # prohibited-trailing-comma
   'D105',    # undocumented-magic-method
   'D106',    # undocumented-public-nested-class
   'D107',    # undocumented-public-init
@@ -102,8 +37,8 @@ ignore = [
   'TD002',   # todo format
   'TD003',   # todo format
   'PT013',   # Found incorrect import of pytest
-  'SLF001',
-  'PLC2701',
+  'SLF001',  # Private member accessed
+  'PLC2701', # import-private-name
 ]
 
 [lint.per-file-ignores]
