@@ -71,7 +71,7 @@ def run_hook_patched(
     elif hook_name == "pre_gen_project":
         run_hook(hook_name, project_dir, context)
         master = Master()
-        master.install_inherited_templates(project_dir, context)
+        master.install_templates(project_dir, context)
 
 
 def run_pre_prompt_hook_patched(repo_dir: os.PathLike[str]) -> Path:
@@ -87,11 +87,12 @@ def create_env_with_context_patched(context: dict[str, Any]) -> jinja2.Environme
     """
     master = Master()
     env_vars = context.get("cookiecutter", {}).get("_jinja2_env_vars", {})
-    env = SharedEnvironment(
+    context["cookiecutter"].setdefault("_repo_dir", str(master.get_current_template().repo))
+    return SharedEnvironment(
+        context=context,
         keep_trailing_newline=True,
         **env_vars,
     )
-    return master.update_jinja_environment(env, context)
 
 
 # Applying patched functions

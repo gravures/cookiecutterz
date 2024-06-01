@@ -27,7 +27,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, NewType, cast, final
 
 from cookiecutter import config, main, repository
-from cookiecutter.exceptions import CookiecutterException, UnknownExtension
+from cookiecutter.environment import ExtensionLoaderMixin
+from cookiecutter.exceptions import CookiecutterException
 from cookiecutter.utils import work_in
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
@@ -44,6 +45,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger("cookiecutter.inheritance")
 LOG_LEVEL = logging.INFO
 
+# TODO: handle the complete set of options to expand
+#       a cookiecutter template (eg: directory, ...)
+
 
 # TODO: report a bug to cooikecutter team
 #       copy hidden dir like .venv and fails
@@ -57,7 +61,6 @@ def create_tmp_repo_dir(repo_dir: os.PathLike[str]) -> Path:
         repo_dir,
         new_dir,
         ignore=shutil.ignore_patterns(
-            ".git",
             "__pycache__",
             "*.pyc",
             "venv",
@@ -92,58 +95,123 @@ class CircularInheritanceException(CookiecutterException):
         return "Circular reference found in template inheritance resolution."
 
 
-class SharedEnvironment(Environment):
-    """Class replacement for cookiecutter.StrictEnvironment."""
-
-    _inits: ClassVar[set[int]] = set()
-
-    def __new__(cls, *args: Any, **kwargs: Any) -> SharedEnvironment:  # noqa: PYI034, ARG003
-        """SharedEnvironment are cached across cookiecutter session."""
-        master = Master()
-        if env := master._cached_jinja_environments.get(master.current):
-            return env
-        return super().__new__(cls)
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        if id(self) not in SharedEnvironment._inits:
-            extensions: list[str | type[Extension]] = [
-                "cookiecutter.extensions.JsonifyExtension",
-                "cookiecutter.extensions.RandomStringExtension",
-                "cookiecutter.extensions.SlugifyExtension",
-                "cookiecutter.extensions.TimeExtension",
-                "cookiecutter.extensions.UUIDExtension",
-            ]
-            master = Master()
-            if m_ext := master.jinja_extensions.get(master.current):
-                extensions.extend(m_ext)
-
-            try:
-                super().__init__(*args, extensions=extensions, undefined=StrictUndefined, **kwargs)
-            except ImportError as err:
-                msg = f"Unable to load extension: {err}"
-                raise UnknownExtension(msg) from err
-            else:
-                SharedEnvironment._inits.add(id(self))
-                master._cached_jinja_environments[master.current] = self
+Context = NewType("Context", dict[str, Any])
+Url = NewType("Url", str)
 
 
-TName = NewType("TName", str)
+def _log_context(context: dict[str, Any]) -> None:
+    logger.log(LOG_LEVEL, "\n%s", json.dumps(context, indent=2))
 
 
-class Template:
-    """Template data."""
+class RepoID:
+    """RepoID allow to uniqly identify a repo directory.
 
-    __slots__ = ("_cc", "_name", "_repo", "_url")
+    We check against template Path stem instead of plain Path
+    because repo could be a temporary copy of the initial repo,
+    (see: run_pre_prompt_hook()).
 
-    def __init__(self, *, repo: Path) -> None:
-        self._repo: Path = repo
-        self._name: TName = TName(repo.stem)
-        self._url: str | None = None
-        self._cc: NewOrderedDict[str, Any] = NewOrderedDict()
+    NOTE: this have the limation of not handling different
+          templates resolving to the same name.
+    """
+
+    __slots__ = ("_id",)
+
+    def __init__(self, repo: Path) -> None:
+        self._id: str = repo.stem
+
+    def __str__(self) -> str:
+        return self._id
+
+    def __repr__(self) -> str:
+        return f"RepoID({self._id})"
+
+    def __hash__(self) -> int:
+        return hash(self._id)
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, RepoID) and self._id == other._id
+
+
+class Unique:
+    """Protocol for classes that are related to a repo."""
+
+    __slots__ = ("_id",)
+
+    def __init__(self, repo_id: RepoID) -> None:
+        self._id = repo_id
 
     @property
-    def name(self) -> TName:  # noqa: D102
-        return self._name
+    def repo_id(self) -> RepoID:
+        """Returns the Unique RepoID attached to self."""
+        return self._id
+
+    @repo_id.setter
+    def repo_id(self, value: RepoID) -> None:
+        """Returns the Unique RepoID attached to self."""
+        self._id = value
+
+
+@final
+class SharedEnvironment(Unique, ExtensionLoaderMixin, Environment):
+    """Class replacement for cookiecutter.StrictEnvironment."""
+
+    _cached_environments: ClassVar[dict[RepoID, SharedEnvironment]] = {}
+    _cached_extensions: ClassVar[dict[RepoID, set[type[Extension]]]] = {}
+    _global_template_dirs: ClassVar[set[str]] = set()
+    _tmp_id: ClassVar[RepoID | None] = None
+
+    def __new__(cls, **kwargs: Any) -> SharedEnvironment:
+        """SharedEnvironment are cached across cookiecutter session."""
+        if not (context := kwargs.get("context")):
+            msg = "Missing context named argument"
+            raise ValueError(msg)
+
+        _id = RepoID(Path(context["cookiecutter"]["_repo_dir"]))
+        if env := cls._cached_environments.get(_id):
+            return env
+        cls._tmp_id = _id
+        return super().__new__(cls)
+
+    def __init__(self, **kwargs: Any) -> None:
+        if SharedEnvironment._tmp_id:
+            Unique.__init__(self, SharedEnvironment._tmp_id)
+            ExtensionLoaderMixin.__init__(self, undefined=StrictUndefined, **kwargs)  # pyright: ignore[reportUnknownMemberType]
+            SharedEnvironment._cached_environments[self.repo_id] = self
+            SharedEnvironment._tmp_id = None
+
+    def _read_extensions(self, context: Context) -> list[type[Extension]]:
+        extensions = cast(list[str], super()._read_extensions(context))  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+        repo: Path = Path(context["cookiecutter"]["_repo_dir"])
+        self._register(repo, extensions)
+        return list(SharedEnvironment._cached_extensions[self.repo_id])
+
+    def _register(self, repo: Path, extensions: list[str]) -> None:
+        """Registers Jinja templates directory and extensions."""
+        # register jinja template directory globally
+        if (tmp := repo / "templates").is_dir():
+            self._global_template_dirs.add(str(tmp))
+
+        # register extensions for each template
+        SharedEnvironment._cached_extensions[self.repo_id] = set()
+        for ext in extensions:
+            _p = ext.split(".")
+            if (mod := loads_module(_p[0], repo)) and (_ext := getattr(mod, _p[-1], None)):
+                SharedEnvironment._cached_extensions[self.repo_id].add(_ext)
+        logger.log(
+            LOG_LEVEL, "registered jinja extensions %s", SharedEnvironment._cached_extensions
+        )
+
+
+class Template(Unique):
+    """Template data."""
+
+    __slots__ = ("_cc", "_id", "_repo", "_url")
+
+    def __init__(self, *, repo: Path, url: Url | None = None) -> None:
+        self._repo: Path = repo
+        self._url: Url = url or Url("Undefined")
+        self._cc: NewOrderedDict[str, Any] = NewOrderedDict()
+        super().__init__(RepoID(self._repo))
 
     @property
     def repo(self) -> Path:  # noqa: D102
@@ -151,13 +219,13 @@ class Template:
 
     @repo.setter
     def repo(self, value: Path) -> None:
-        if value.stem != self._name:
-            msg = f"value {value} does not fit template name {self._name}"
-            raise ValueError(msg)
         self._repo = value
+        if RepoID(self._repo) != self.repo_id:
+            msg = f"new value {value} does not meet actual template name {value.stem}"
+            raise ValueError(msg)
 
     @property
-    def url(self) -> str | None:  # noqa: D102
+    def url(self) -> Url:  # noqa: D102
         return self._url
 
     @property
@@ -177,11 +245,11 @@ class Template:
             json.dump(self._cc, stream, indent=2)
 
     @staticmethod
-    def from_url(url: str) -> Template:
+    def from_url(url: Url) -> Template:
         """Return Template instance from remote/local url."""
         user_config: dict[str, Any] = config.get_user_config()  # pyright: ignore [reportUnknownMemberType]
-        # clone the inherited template locally
-        # or use it if it's already a directory
+        # clone the template from url locally
+        # or use it if it's already a cloned directory
         repo, _ = repository.determine_repo_dir(  # pyright: ignore[reportUnknownMemberType]
             template=url,
             abbreviations=user_config["abbreviations"],
@@ -190,15 +258,14 @@ class Template:
             no_input=True,
         )
         repo = Path(cast(str, repo))
-        _t = Template(repo=repo)
+        _t = Template(repo=repo, url=url)
         _t.import_cookiecutter()
-        _t._url = url
         return _t
 
 
 @final
 class Master:
-    """Singleton Template Master class."""
+    """Master Template singleton class."""
 
     _instance: ClassVar[Master | None] = None
     _init: ClassVar[bool] = False
@@ -206,13 +273,10 @@ class Master:
     __slots__ = (
         "__tro__",
         "_bases_installed",
-        "_cached_jinja_environments",
+        "_cloned",
         "_inspected",
-        "_tmp_repo",
         "current",
         "cwd",
-        "jinja_extensions",
-        "jinja_templates",
         "stage",
         "template",
     )
@@ -232,20 +296,21 @@ class Master:
 
         self._bases_installed: bool = False
         self._inspected: bool = False
-        self._tmp_repo: bool = work_dir != repo
-
-        self.template = Template(repo=work_dir or repo)
-        self.stage: str = "init"
-        self.current: TName = TName("")
+        self.__tro__: NewOrderedDict[RepoID, Template] = NewOrderedDict()
+        self._cloned: bool = bool(work_dir and work_dir != repo)
         self.cwd: Path = Path.cwd()
-
-        self.__tro__: NewOrderedDict[TName, Template] = NewOrderedDict()
-        self.jinja_templates: set[str] = set()
-        self.jinja_extensions: dict[TName, set[type[Extension]]] = {}
-        self._cached_jinja_environments: dict[TName, SharedEnvironment] = {}
+        self.template = Template(repo=work_dir or repo)
+        self.current: RepoID = self.template.repo_id
+        self.stage: str = "init"
 
         Master._init = True
         self._prepare()
+
+    def get_current_template(self) -> Template:
+        """Return current template."""
+        return (
+            self.template if self.current == self.template.repo_id else self.__tro__[self.current]
+        )
 
     def _prepare(self) -> None:  # sourcery skip: extract-method
         """Inspect and prepare the master template.
@@ -260,24 +325,22 @@ class Master:
         self.template.import_cookiecutter()
         if self.template.cookiecutter.get("_bases"):
             self.template.repo = (
-                self.template.repo if self._tmp_repo else create_tmp_repo_dir(self.template.repo)
+                self.template.repo if self._cloned else create_tmp_repo_dir(self.template.repo)
             )
             self.template.cookiecutter.setdefault("_copy_without_render", [])
             self.template.cookiecutter.setdefault("__prompts__", {})
-            self._register_jinja_extensions(self.template)
             self._inspect_template(self.template)
 
             # export merged cookiecutter mapping to json in place of original
             self.template.export_cookiercutter()
-            logger.log(LOG_LEVEL, "\n%s", json.dumps(self.template.cookiecutter, indent=2))
+            _log_context(self.template.cookiecutter)
 
         self._inspected = True
         self.stage = "inspected"
-        self.current = self.template.name
 
     def _inspect_template(self, template: Template) -> None:
         """Inspect template and populate base templates."""
-        if not (bases := cast(list[str], template.cookiecutter.get("_bases"))):
+        if not (bases := cast(list[Url], template.cookiecutter.get("_bases"))):
             return
 
         # template could have multiples inheritance
@@ -290,7 +353,7 @@ class Master:
             self._inspect_template(base)
 
             # Assure proper Templates Resolution Order
-            self.__tro__.move_to_end(base.name, last=True)
+            self.__tro__.move_to_end(base.repo_id, last=True)
 
             # Forward input fields if not defined in master template
             _curr: str = cc_master.first
@@ -313,68 +376,48 @@ class Master:
                 )
             )
 
-            # Register jinja environment
-            self._register_jinja_extensions(base)
-
-    def _register_template(self, url: str) -> Template:
+    def _register_template(self, url: Url) -> Template:
         """Register a template as a base template..
 
         Avoid circular inheritance in a very restrictive way.
-        We check against template name instead of template repo
-        because repo could be a tmp copy of a genuine repo
-        (see: run_pre_prompt_hook()).
         """
-        # NOTE: this implies the limation of forbid different template
-        #       (eg: frm different authors and diifferent url) resolving
-        #       to the same name
         tmpl = Template.from_url(url)
-        if tmpl.name == self.template.name or (self.__tro__ and tmpl.name in self.__tro__):
+        if tmpl.repo_id == self.template.repo_id or (
+            self.__tro__ and tmpl.repo_id in self.__tro__
+        ):
             raise CircularInheritanceException
-        self.__tro__[tmpl.name] = tmpl
+        self.__tro__[tmpl.repo_id] = tmpl
         return tmpl
 
-    def _register_jinja_extensions(self, template: Template) -> None:
-        """Registers Jinja templates directory and extensions."""
-        # register jinja template directory globally
-        if (tmp := template.repo / "templates").is_dir():
-            self.jinja_templates.add(str(tmp))
-
-        # register extensions for each template
-        self.jinja_extensions[template.name] = set()
-        for ext in template.cookiecutter.get("_extensions", []):
-            _p = ext.split(".")
-            if (mod := loads_module(_p[0], template.repo)) and (
-                _ext := getattr(mod, _p[-1], None)
-            ):
-                self.jinja_extensions[template.name].add(_ext)
-        logger.log(LOG_LEVEL, "registering jinja extensions %s", self.jinja_extensions)
-
-    def update_jinja_environment(self, env: Environment, context: dict[str, Any]) -> Environment:  # noqa: ARG002
+    def update_jinja_environment(self) -> None:
         """Update the jinja environment with inherited extensions and templates."""
-        if env is self._cached_jinja_environments[self.template.name]:
-            for n, exts in self.jinja_extensions.items():
-                if n != self.template.name:
-                    for e in exts:
-                        env.add_extension(e)
-            if self.jinja_templates:
-                env.loader = FileSystemLoader([".", "../templates", *self.jinja_templates])
+        m_env = SharedEnvironment._cached_environments[self.template.repo_id]
+        for _id, exts in SharedEnvironment._cached_extensions.items():
+            if _id != self.template.repo_id:
+                for e in exts:
+                    m_env.add_extension(e)
+        if SharedEnvironment._global_template_dirs:
+            m_env.loader = FileSystemLoader([
+                ".",
+                "../templates",
+                *SharedEnvironment._global_template_dirs,
+            ])
 
-            logger.log(
-                LOG_LEVEL,
-                "<%s>: Updating the jinja environment (%s) with %s and %s",
-                self.stage,
-                id(env),
-                self.jinja_extensions,
-                self.jinja_templates,
-            )
-        return env
+        logger.log(
+            LOG_LEVEL,
+            "<%s>: Updating the jinja environment(%s) with %s and %s",
+            self.stage,
+            m_env.repo_id,
+            SharedEnvironment._cached_extensions,
+            SharedEnvironment._global_template_dirs,
+        )
 
     @staticmethod
     def get_public_keys(context: dict[str, Any]) -> dict[str, Any]:
         """Filter out private keys from a context."""
         return {k: v for k, v in context.items() if not k.startswith("_")}
 
-    def install_inherited_templates(self, project_dir: str, context: dict[str, Any]) -> None:
+    def install_templates(self, project_dir: str, context: dict[str, Any]) -> None:
         """Install inherited cookiecutter templates.
 
         This function is call as the pre_gen_project hook stage ut after
@@ -384,11 +427,11 @@ class Master:
         """
         self.stage = "install"
 
-        if self.current == self.template.name:
+        if self.current == self.template.repo_id:
             logger.log(LOG_LEVEL, "will %s template %s", self.stage, self.current)
 
         # Safe guard preventing recursive expansion of base template
-        if (not self.__tro__) or self.current != self.template.name:
+        if (not self.__tro__) or self.current != self.template.repo_id:
             return
 
         # Get the user input from the master template provided by cookiecutter
@@ -399,7 +442,7 @@ class Master:
         # Expands base templates using our Template Resolution Order
         for base_t in self.__tro__.values():
             # expands overwriting files if necessary
-            self.current = base_t.name
+            self.current = base_t.repo_id
             logger.log(LOG_LEVEL, "will %s base template %s", self.stage, self.current)
 
             with work_in(self.cwd):
@@ -413,3 +456,4 @@ class Master:
                     skip_if_file_exists=False,
                 )
         self._bases_installed = True
+        self.update_jinja_environment()

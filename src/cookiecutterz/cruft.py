@@ -17,6 +17,8 @@
 
 from __future__ import annotations
 
+import sys
+
 from click import secho
 from cruft._cli import app
 
@@ -25,6 +27,8 @@ import cookiecutterz  # pyright: ignore[reportUnusedImport] # noqa: F401
 
 def main():  # noqa: D103
     secho("This a cookiecutter(z) version of cruft with template extension feature.", fg="green")
+    # FIXME: fix this dirty hack
+    sys.argv.append("--overwrite-if-exists")
     app()
 
 
