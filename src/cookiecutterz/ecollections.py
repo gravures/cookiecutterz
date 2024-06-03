@@ -1,5 +1,5 @@
 # Copyright (c) 2023 - Gilles Coissac
-# This file is part of Cookicutterz program.
+# This file is part of Cookiecutterz program.
 #
 # Cookiecutterz is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published
@@ -19,9 +19,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from test.support.import_helper import import_fresh_module
-from typing import TYPE_CHECKING, Any, Protocol, cast
-
-from typing_extensions import TypeVar
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
 
 
 if TYPE_CHECKING:

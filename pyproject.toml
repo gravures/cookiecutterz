@@ -7,7 +7,7 @@ description = "A cookiecutter extension providing template inheritance"
 authors = [{ name = "Gilles Coissac", email = "gilles@ideographe.fr" }]
 license = { text = "GPL-3.0" }
 requires-python = ">=3.9"
-dependencies = ["cookiecutter>=2.3.0", "cruft>=2.15.0", "pdm>=2.15"]
+dependencies = ["cookiecutter>=2.4.0"]
 readme = "README.md"
 keywords = ['cookiecutter', 'template', 'template-engine']
 classifiers = [
@@ -28,8 +28,7 @@ homepage = "https://github.com/gravures/cookiecutterz"
 source   = "https://github.com/gravures/cookiecutterz"
 
 [project.scripts]
-cookiecutter = "cookiecutterz.main:main"
-cruft        = "cookiecutterz.cruft:main"
+cookiecutter = "cookiecutterz.main:cli"
 
 #####################################################
 # PDM
@@ -40,10 +39,6 @@ build-backend = "pdm.backend"
 
 [tool.pdm]
 distribution = true
-plugins = ["-e file:///${PROJECT_ROOT}"]
-
-[project.entry-points.pdm]
-pdm-cruft = "cookiecutterz.pdm:main"
 
 [tool.pdm.version]
 source         = "scm"
@@ -52,12 +47,12 @@ write_template = "__version__ = '{}'"
 
 [tool.pdm.dev-dependencies]
 dev = [
-    "ruff==0.4.1",
-    "basedpyright==1.10.3",
-    "pre-commit==3.7.0",
-    "tox-pdm>=0.7.2",
-    "dead>=1.5.2",
-    "pretty-errors>=1.2.25",
+  "ruff==0.4.1",
+  "basedpyright==1.10.3",
+  "pre-commit==3.7.0",
+  "tox-pdm>=0.7.2",
+  "dead>=1.5.2",
+  "pretty-errors>=1.2.25",
 ]
 test = ["pytest", "hypothesis", "coverage[toml]", "tox>=4.0"]
 

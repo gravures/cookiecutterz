@@ -101,4 +101,4 @@ def test_pdm_create(tmp_dir: Path, extra_context: dict[str, str]) -> None:
 # template could overload input field of ancestor
 # template do not need to redefined _copy_without_render dict of ancestor
 # template could have multiples inheritance
-# template could inherite from an unaware cookicutterz template
+# template could inherite from an unaware Cookiecutterz template
