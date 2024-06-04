@@ -19,187 +19,29 @@ from __future__ import annotations
 
 import json
 import logging
-import shutil
-import sys
-import tempfile
-from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, NewType, cast, final
+from typing import Any, ClassVar, cast, final
 
 from cookiecutter import config, main, repository
-from cookiecutter.environment import ExtensionLoaderMixin
-from cookiecutter.exceptions import CookiecutterException
 from cookiecutter.utils import work_in
-from jinja2 import Environment, FileSystemLoader, StrictUndefined
+from jinja2 import FileSystemLoader
 
-from cookiecutterz.ecollections import NewOrderedDict
-
-
-if TYPE_CHECKING:
-    import os
-    from types import ModuleType
-
-    from jinja2.ext import Extension
+from cookiecutterz.helpers import create_tmp_repo_dir
+from cookiecutterz.jenvironment import SharedEnvironment
+from cookiecutterz.main import LOG_LEVEL
+from cookiecutterz.mapping import OrderableDict
+from cookiecutterz.types import CircularInheritanceException, Context, RepoID, Unique, Url
 
 
-logger = logging.getLogger("cookiecutter.inheritance")
-LOG_LEVEL = logging.INFO
+logger = logging.getLogger(f"cookiecutter.{__name__}")
+
 
 # TODO: handle the complete set of options to expand
 #       a cookiecutter template (eg: directory, ...)
 
 
-# TODO: report a bug to cooikecutter team
-#       copy hidden dir like .venv and fails
-def create_tmp_repo_dir(repo_dir: os.PathLike[str]) -> Path:
-    """Create a temporary dir with a copy of the contents of repo_dir."""
-    repo_dir = Path(repo_dir).resolve()
-    base_dir = tempfile.mkdtemp(prefix="cookiecutter")
-    new_dir = f"{base_dir}/{repo_dir.name}"
-    logger.log(LOG_LEVEL, "Copying repo_dir from %s to %s", repo_dir, new_dir)
-    shutil.copytree(
-        repo_dir,
-        new_dir,
-        ignore=shutil.ignore_patterns(
-            "__pycache__",
-            "*.pyc",
-            "venv",
-            ".venv",
-        ),
-    )
-    return Path(new_dir)
-
-
-def loads_module(name: str, where: Path) -> ModuleType | None:
-    """Loads a python module or package from the Path where."""
-    source = where / name
-    source = source / "__init__.py" if source.is_dir() else source.with_suffix(".py")
-
-    logger.log(LOG_LEVEL, "loading module '%s' from '%s'", name, source)
-    spec = spec_from_file_location(name=name, location=source)
-    if spec is not None and (module := module_from_spec(spec)) and spec.loader:
-        try:
-            sys.modules[name] = module
-            spec.loader.exec_module(module)
-        except FileNotFoundError:
-            return None
-        return module
-    return None
-
-
-class CircularInheritanceException(CookiecutterException):
-    """Exception raised with circular reference in inheritance resolution."""
-
-    def __str__(self) -> str:
-        """Text representation of CircularInheritanceException."""
-        return "Circular reference found in template inheritance resolution."
-
-
-Context = NewType("Context", dict[str, Any])
-Url = NewType("Url", str)
-
-
 def _log_context(context: dict[str, Any]) -> None:
     logger.log(LOG_LEVEL, "\n%s", json.dumps(context, indent=2))
-
-
-class RepoID:
-    """RepoID allow to uniqly identify a repo directory.
-
-    We check against template Path stem instead of plain Path
-    because repo could be a temporary copy of the initial repo,
-    (see: run_pre_prompt_hook()).
-
-    NOTE: this have the limation of not handling different
-          templates resolving to the same name.
-    """
-
-    __slots__ = ("_id",)
-
-    def __init__(self, repo: Path) -> None:
-        self._id: str = repo.stem
-
-    def __str__(self) -> str:
-        return self._id
-
-    def __repr__(self) -> str:
-        return f"RepoID({self._id})"
-
-    def __hash__(self) -> int:
-        return hash(self._id)
-
-    def __eq__(self, other: object) -> bool:
-        return isinstance(other, RepoID) and self._id == other._id
-
-
-class Unique:
-    """Protocol for classes that are related to a repo."""
-
-    __slots__ = ("_id",)
-
-    def __init__(self, repo_id: RepoID) -> None:
-        self._id = repo_id
-
-    @property
-    def repo_id(self) -> RepoID:
-        """Returns the Unique RepoID attached to self."""
-        return self._id
-
-    @repo_id.setter
-    def repo_id(self, value: RepoID) -> None:
-        """Returns the Unique RepoID attached to self."""
-        self._id = value
-
-
-@final
-class SharedEnvironment(Unique, ExtensionLoaderMixin, Environment):
-    """Class replacement for cookiecutter.StrictEnvironment."""
-
-    _cached_environments: ClassVar[dict[RepoID, SharedEnvironment]] = {}
-    _cached_extensions: ClassVar[dict[RepoID, set[type[Extension]]]] = {}
-    _global_template_dirs: ClassVar[set[str]] = set()
-    _tmp_id: ClassVar[RepoID | None] = None
-
-    def __new__(cls, **kwargs: Any) -> SharedEnvironment:
-        """SharedEnvironment are cached across cookiecutter session."""
-        if not (context := kwargs.get("context")):
-            msg = "Missing context named argument"
-            raise ValueError(msg)
-
-        _id = RepoID(Path(context["cookiecutter"]["_repo_dir"]))
-        if env := cls._cached_environments.get(_id):
-            return env
-        cls._tmp_id = _id
-        return super().__new__(cls)
-
-    def __init__(self, **kwargs: Any) -> None:
-        if SharedEnvironment._tmp_id:
-            Unique.__init__(self, SharedEnvironment._tmp_id)
-            ExtensionLoaderMixin.__init__(self, undefined=StrictUndefined, **kwargs)  # pyright: ignore[reportUnknownMemberType]
-            SharedEnvironment._cached_environments[self.repo_id] = self
-            SharedEnvironment._tmp_id = None
-
-    def _read_extensions(self, context: Context) -> list[type[Extension]]:
-        extensions = cast(list[str], super()._read_extensions(context))  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
-        repo: Path = Path(context["cookiecutter"]["_repo_dir"])
-        self._register(repo, extensions)
-        return list(SharedEnvironment._cached_extensions[self.repo_id])
-
-    def _register(self, repo: Path, extensions: list[str]) -> None:
-        """Registers Jinja templates directory and extensions."""
-        # register jinja template directory globally
-        if (tmp := repo / "templates").is_dir():
-            self._global_template_dirs.add(str(tmp))
-
-        # register extensions for each template
-        SharedEnvironment._cached_extensions[self.repo_id] = set()
-        for ext in extensions:
-            _p = ext.split(".")
-            if (mod := loads_module(_p[0], repo)) and (_ext := getattr(mod, _p[-1], None)):
-                SharedEnvironment._cached_extensions[self.repo_id].add(_ext)
-        logger.log(
-            LOG_LEVEL, "registered jinja extensions %s", SharedEnvironment._cached_extensions
-        )
 
 
 class Template(Unique):
@@ -210,7 +52,7 @@ class Template(Unique):
     def __init__(self, *, repo: Path, url: Url | None = None) -> None:
         self._repo: Path = repo
         self._url: Url = url or Url("Undefined")
-        self._cc: NewOrderedDict[str, Any] = NewOrderedDict()
+        self._cc: OrderableDict[str, Any] = OrderableDict()
         super().__init__(RepoID(self._repo))
 
     @property
@@ -229,14 +71,14 @@ class Template(Unique):
         return self._url
 
     @property
-    def cookiecutter(self) -> NewOrderedDict[str, Any]:  # noqa: D102
+    def cookiecutter(self) -> OrderableDict[str, Any]:  # noqa: D102
         return self._cc
 
     def import_cookiecutter(self) -> None:
         """Return cookiecutter.json content as a dictionary."""
         cc_json = self._repo / "cookiecutter.json"
         with cc_json.open("r") as stream:
-            self._cc = NewOrderedDict(json.loads(stream.read()))
+            self._cc = OrderableDict(json.loads(stream.read()))
 
     def export_cookiercutter(self) -> None:
         """Export cookiecutter.json content from dictionary."""
@@ -296,7 +138,7 @@ class Master:
 
         self._bases_installed: bool = False
         self._inspected: bool = False
-        self.__tro__: NewOrderedDict[RepoID, Template] = NewOrderedDict()
+        self.__tro__: OrderableDict[RepoID, Template] = OrderableDict()
         self._cloned: bool = bool(work_dir and work_dir != repo)
         self.cwd: Path = Path.cwd()
         self.template = Template(repo=work_dir or repo)
@@ -357,7 +199,7 @@ class Master:
 
             # Forward input fields if not defined in master template
             _curr: str = cc_master.first
-            for k, v in self.get_public_keys(cc_base).items():
+            for k, v in self.get_public_keys(Context(cc_base)).items():
                 # Assure bases keys are first
                 # cc_master.setdefault(k, v)
                 if k in cc_master:
@@ -413,11 +255,11 @@ class Master:
         )
 
     @staticmethod
-    def get_public_keys(context: dict[str, Any]) -> dict[str, Any]:
+    def get_public_keys(context: Context) -> Context:
         """Filter out private keys from a context."""
-        return {k: v for k, v in context.items() if not k.startswith("_")}
+        return Context({k: v for k, v in context.items() if not k.startswith("_")})
 
-    def install_templates(self, project_dir: str, context: dict[str, Any]) -> None:
+    def install_bases(self, project_dir: str, context: Context) -> None:
         """Install inherited cookiecutter templates.
 
         This function is call as the pre_gen_project hook stage ut after
@@ -436,8 +278,8 @@ class Master:
 
         # Get the user input from the master template provided by cookiecutter
         # logger.log(LOG_LEVEL, "DEBUG INSTALL: %s", context)
-        cc_input: dict[str, Any] = context.get("cookiecutter", {})
-        public_keys: dict[str, Any] = self.get_public_keys(cc_input)
+        cc_input: Context = context.get("cookiecutter", {})
+        public_keys: Context = self.get_public_keys(cc_input)
 
         # Expands base templates using our Template Resolution Order
         for base_t in self.__tro__.values():

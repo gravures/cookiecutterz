@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Cookiecutterz. If not, see <https://www.gnu.org/licenses/>
-"""Collections module for cookiecutterz."""
+"""Mapping module."""
 
 from __future__ import annotations
 
@@ -41,8 +41,8 @@ class _Link(Protocol[_KT]):
         self.prev: _Link[_KT]
 
 
-class NewOrderedDict(_OrderedDict, dict[_KT, _VT]):
-    """Insertion capable OrderedDict."""
+class OrderableDict(_OrderedDict, dict[_KT, _VT]):
+    """RordeableDict is a more capable OrderedDict."""
 
     def __init__(self, other: Any = (), /, **kwargs: _VT) -> None:
         super().__init__(other, **kwargs)

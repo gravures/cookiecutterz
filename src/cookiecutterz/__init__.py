@@ -25,7 +25,9 @@ from cookiecutter import hooks, prompt, utils
 from cookiecutter.hooks import run_hook, run_pre_prompt_hook
 
 from cookiecutterz._version import __version__
-from cookiecutterz.inheritance import Master, SharedEnvironment
+from cookiecutterz.inheritance import Master
+from cookiecutterz.jenvironment import SharedEnvironment
+from cookiecutterz.types import Context
 
 
 if TYPE_CHECKING:
@@ -60,24 +62,28 @@ def uncache(exclude: list[str]) -> None:
 
 
 # MONKEY PATCHING COOKIECUTTER
+def run_pre_prompt_hook_patched(repo_dir: os.PathLike[str]) -> Path:
+    """Main entry point in template generation process."""
+    work_dir: Path = run_pre_prompt_hook(repo_dir)
+    master = Master(repo=Path(repo_dir), work_dir=Path(work_dir))
+    return master.template.repo
+
+
 def run_hook_patched(
     hook_name: str,
     project_dir: str,
     context: dict[str, Any],
 ) -> None:
-    """Main entry point in template generation process."""
+    """Secondary entry point in template generation process.
+
+    Those will happened inside te generate_files() cookicutter function.
+    """
     if hook_name == "post_gen_project":
         run_hook(hook_name, project_dir, context)
     elif hook_name == "pre_gen_project":
         run_hook(hook_name, project_dir, context)
         master = Master()
-        master.install_templates(project_dir, context)
-
-
-def run_pre_prompt_hook_patched(repo_dir: os.PathLike[str]) -> Path:
-    work_dir: Path = run_pre_prompt_hook(repo_dir)
-    master = Master(repo=Path(repo_dir), work_dir=Path(work_dir))
-    return master.template.repo
+        master.install_bases(project_dir, Context(context))
 
 
 def create_env_with_context_patched(context: dict[str, Any]) -> jinja2.Environment:

@@ -17,9 +17,14 @@
 
 from __future__ import annotations
 
+import logging
+
 import click
 from click import command, secho
 from cookiecutter.cli import main as _main
+
+
+LOG_LEVEL = logging.INFO
 
 
 class ModGroup(click.Group):  # noqa: D101
