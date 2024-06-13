@@ -20,12 +20,13 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, ClassVar, cast, final
+from typing import Any, cast, final
 
 from cookiecutter import config, main, repository
 from cookiecutter.utils import work_in
 from jinja2 import FileSystemLoader
 
+from cookiecutterz.creators import Singleton
 from cookiecutterz.helpers import create_tmp_repo_dir
 from cookiecutterz.jenvironment import SharedEnvironment
 from cookiecutterz.main import LOG_LEVEL
@@ -94,11 +95,8 @@ class Template(Unique):
 
 
 @final
-class Master:
+class Master(Singleton):
     """Master Template singleton class."""
-
-    _instance: ClassVar[Master | None] = None
-    _init: ClassVar[bool] = False
 
     __slots__ = (
         "__tro__",
@@ -111,15 +109,7 @@ class Master:
         "template",
     )
 
-    def __new__(cls, *, repo: Path | None = None, work_dir: Path | None = None) -> Master:  # noqa: D102, ARG003
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
     def __init__(self, *, repo: Path | None = None, work_dir: Path | None = None) -> None:
-        if Master._init:
-            return
-
         if repo is None:
             msg = "First call to Master() should supply a repo parameter"
             raise ValueError(msg)
@@ -133,7 +123,6 @@ class Master:
         self.current: RepoID = self.template.repo_id
         self.stage: str = "init"
 
-        Master._init = True
         self._prepare()
 
     def get_current_template(self) -> Template:
