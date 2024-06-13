@@ -59,6 +59,8 @@ class Singleton(metaclass=SingletonMeta):
     once on this instance (except in the case of being explicitly called again).
     """
 
+    __slots__ = ()
+
 
 class MultitonMeta(ABCMeta):
     """Multiton metaclass."""
@@ -117,6 +119,8 @@ class Multiton(metaclass=MultitonMeta):
     Like with the Singleton of this module, the __init__ method is ensure to
     be called only once by instance (except in the case of being explicitly called).
     """
+
+    __slots__ = ()
 
     @classmethod
     @abstractmethod
