@@ -83,7 +83,7 @@ def run_hook_patched(
     elif hook_name == "pre_gen_project":
         run_hook(hook_name, project_dir, context)
         master = Master()
-        master.install_bases(project_dir, Context(context))
+        master.install_bases(project_dir, Context(context=context))
 
 
 def create_env_with_context_patched(context: dict[str, Any]) -> jinja2.Environment:

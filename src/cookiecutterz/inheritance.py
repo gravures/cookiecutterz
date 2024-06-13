@@ -47,12 +47,12 @@ def _log_context(context: dict[str, Any]) -> None:
 class Template(Unique):
     """Template data."""
 
-    __slots__ = ("_cc", "_id", "_repo", "_url")
+    __slots__ = ("_context", "_repo", "_url")
 
     def __init__(self, *, repo: Path, url: Url | None = None) -> None:
         self._repo: Path = repo
         self._url: Url = url or Url("Undefined")
-        self._cc: OrderableDict[str, Any] = OrderableDict()
+        self._context: Context = Context.generate(directory=repo)
         super().__init__(RepoID(self._repo))
 
     @property
@@ -71,27 +71,17 @@ class Template(Unique):
         return self._url
 
     @property
-    def cookiecutter(self) -> OrderableDict[str, Any]:  # noqa: D102
-        return self._cc
-
-    def import_cookiecutter(self) -> None:
-        """Return cookiecutter.json content as a dictionary."""
-        cc_json = self._repo / "cookiecutter.json"
-        with cc_json.open("r") as stream:
-            self._cc = OrderableDict(json.loads(stream.read()))
-
-    def export_cookiercutter(self) -> None:
-        """Export cookiecutter.json content from dictionary."""
-        cc_json = self._repo / "cookiecutter.json"
-        with cc_json.open("w") as stream:
-            json.dump(self._cc, stream, indent=2)
+    def context(self) -> Context:  # noqa: D102
+        return self._context
 
     @staticmethod
     def from_url(url: Url) -> Template:
-        """Return Template instance from remote/local url."""
+        """Return a Template from a remote repo or a local directory.
+
+        The repo for the retuned Template is cloned locally from
+        the url or use as it is if already a local directory.
+        """
         user_config: dict[str, Any] = config.get_user_config()  # pyright: ignore [reportUnknownMemberType]
-        # clone the template from url locally
-        # or use it if it's already a cloned directory
         repo, _ = repository.determine_repo_dir(  # pyright: ignore[reportUnknownMemberType]
             template=url,
             abbreviations=user_config["abbreviations"],
@@ -100,9 +90,7 @@ class Template(Unique):
             no_input=True,
         )
         repo = Path(cast(str, repo))
-        _t = Template(repo=repo, url=url)
-        _t.import_cookiecutter()
-        return _t
+        return Template(repo=repo, url=url)
 
 
 @final
@@ -164,32 +152,31 @@ class Master:
         if self._inspected:
             return
 
-        self.template.import_cookiecutter()
-        if self.template.cookiecutter.get("_bases"):
+        if self.template.context.cookiecutter.get("_bases"):
             self.template.repo = (
                 self.template.repo if self._cloned else create_tmp_repo_dir(self.template.repo)
             )
-            self.template.cookiecutter.setdefault("_copy_without_render", [])
-            self.template.cookiecutter.setdefault("__prompts__", {})
+            self.template.context.cookiecutter.setdefault("_copy_without_render", [])
+            self.template.context.cookiecutter.setdefault("__prompts__", {})
             self._inspect_template(self.template)
 
             # export merged cookiecutter mapping to json in place of original
-            self.template.export_cookiercutter()
-            _log_context(self.template.cookiecutter)
+            self.template.context.export(directory=self.template.repo)
+            _log_context(self.template.context.cookiecutter)
 
         self._inspected = True
         self.stage = "inspected"
 
     def _inspect_template(self, template: Template) -> None:
         """Inspect template and populate base templates."""
-        if not (bases := cast(list[Url], template.cookiecutter.get("_bases"))):
+        if not (bases := cast(list[Url], template.context.cookiecutter.get("_bases"))):
             return
 
         # template could have multiples inheritance
         for base_t in bases:
             base = self._register_template(url=base_t)
-            cc_master = self.template.cookiecutter
-            cc_base = base.cookiecutter
+            cc_master = self.template.context.cookiecutter
+            cc_base = base.context.cookiecutter
 
             # recursively inspect bases template hierarchy
             self._inspect_template(base)
@@ -199,7 +186,7 @@ class Master:
 
             # Forward input fields if not defined in master template
             _curr: str = cc_master.first
-            for k, v in self.get_public_keys(Context(cc_base)).items():
+            for k, v in base.context.public_keys:
                 # Assure bases keys are first
                 # cc_master.setdefault(k, v)
                 if k in cc_master:
@@ -254,11 +241,6 @@ class Master:
             SharedEnvironment._global_template_dirs,
         )
 
-    @staticmethod
-    def get_public_keys(context: Context) -> Context:
-        """Filter out private keys from a context."""
-        return Context({k: v for k, v in context.items() if not k.startswith("_")})
-
     def install_bases(self, project_dir: str, context: Context) -> None:
         """Install inherited cookiecutter templates.
 
@@ -278,8 +260,7 @@ class Master:
 
         # Get the user input from the master template provided by cookiecutter
         # logger.log(LOG_LEVEL, "DEBUG INSTALL: %s", context)
-        cc_input: Context = context.get("cookiecutter", {})
-        public_keys: Context = self.get_public_keys(cc_input)
+        public_keys = context.public_keys
 
         # Expands base templates using our Template Resolution Order
         for base_t in self.__tro__.values():
