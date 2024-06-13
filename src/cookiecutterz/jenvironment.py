@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast, final
 from cookiecutter.environment import ExtensionLoaderMixin
 from jinja2 import Environment, StrictUndefined
 
+from cookiecutterz.creators import Multiton
 from cookiecutterz.helpers import loads_module
 from cookiecutterz.main import LOG_LEVEL
 from cookiecutterz.types import Context, RepoID, Unique
@@ -36,32 +37,33 @@ logger = logging.getLogger(f"cookiecutter.{__name__}")
 
 
 @final
-class SharedEnvironment(Unique, ExtensionLoaderMixin, Environment):
-    """Class replacement for cookiecutter.StrictEnvironment."""
+class SharedEnvironment(Multiton, Unique, ExtensionLoaderMixin, Environment, weakref=False):
+    """Class replacement for cookiecutter.StrictEnvironment.
 
-    _cached_environments: ClassVar[dict[RepoID, SharedEnvironment]] = {}
+    SharedEnvironment are cached across cookiecutter session.
+    """
+
     _cached_extensions: ClassVar[dict[RepoID, set[type[Extension]]]] = {}
     _global_template_dirs: ClassVar[set[str]] = set()
-    _tmp_id: ClassVar[RepoID | None] = None
+    _tmp_id: ClassVar[RepoID]
 
-    def __new__(cls, **kwargs: Any) -> SharedEnvironment:
-        """SharedEnvironment are cached across cookiecutter session."""
+    @classmethod
+    def __id__(cls, *_args: Any, **kwargs: Any) -> int:  # noqa: PLW3201
+        """Return the repository ID."""
         if not (context := kwargs.get("context")):
             msg = "Missing context named argument"
             raise ValueError(msg)
+        cls._tmp_id = RepoID(Path(context["cookiecutter"]["_repo_dir"]))
+        return hash(cls._tmp_id)
 
-        _id = RepoID(Path(context["cookiecutter"]["_repo_dir"]))
-        if env := cls._cached_environments.get(_id):
-            return env
-        cls._tmp_id = _id
-        return super().__new__(cls)
+    @classmethod
+    def get(cls, repo_id: RepoID) -> SharedEnvironment | None:
+        """Return the environment for the given repository ID."""
+        return super()._get(hash(repo_id))
 
     def __init__(self, **kwargs: Any) -> None:
-        if SharedEnvironment._tmp_id:
-            Unique.__init__(self, SharedEnvironment._tmp_id)
-            ExtensionLoaderMixin.__init__(self, undefined=StrictUndefined, **kwargs)  # pyright: ignore[reportUnknownMemberType]
-            SharedEnvironment._cached_environments[self.repo_id] = self
-            SharedEnvironment._tmp_id = None
+        Unique.__init__(self, SharedEnvironment._tmp_id)
+        ExtensionLoaderMixin.__init__(self, undefined=StrictUndefined, **kwargs)  # pyright: ignore[reportUnknownMemberType]
 
     def _read_extensions(self, context: Context) -> list[type[Extension]]:
         extensions = cast(list[str], super()._read_extensions(context))  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]

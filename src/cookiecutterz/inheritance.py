@@ -209,7 +209,9 @@ class Master(Singleton):
 
     def update_jinja_environment(self) -> None:
         """Update the jinja environment with inherited extensions and templates."""
-        m_env = SharedEnvironment._cached_environments[self.template.repo_id]
+        if not (m_env := SharedEnvironment.get(self.template.repo_id)):
+            return
+
         for _id, exts in SharedEnvironment._cached_extensions.items():
             if _id != self.template.repo_id:
                 for e in exts:

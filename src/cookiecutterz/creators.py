@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import weakref
 from abc import ABCMeta, abstractmethod
-from typing import Any
+from typing import Any, TypeVar
 
 
 class SingletonMeta(type):
@@ -67,14 +67,14 @@ class MultitonMeta(ABCMeta):
 
     ID_METH_NAME = "__id__"
     INSTANCES_MAP_NAME = "__instances__"
-    WEAKREF_MODE_NAME = "__multiton_weakref__"
+    WEAKREF_MODE_FLAG = "__multiton_weakref__"
 
     def __new__(
         cls, name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwargs: Any
     ) -> MultitonMeta:
         """Type creation."""
         namespace[MultitonMeta.INSTANCES_MAP_NAME] = {}
-        namespace[MultitonMeta.WEAKREF_MODE_NAME] = bool(kwargs.pop("weakref", True))
+        namespace[MultitonMeta.WEAKREF_MODE_FLAG] = bool(kwargs.pop("weakref", True))
 
         return type.__new__(cls, name, bases, namespace, **kwargs)
 
@@ -82,7 +82,7 @@ class MultitonMeta(ABCMeta):
         """Called when instancing a type."""
         _id = getattr(cls, MultitonMeta.ID_METH_NAME)(*args, **kwargs)
         _is = getattr(cls, MultitonMeta.INSTANCES_MAP_NAME)
-        _wr = getattr(cls, MultitonMeta.WEAKREF_MODE_NAME)
+        _wr = getattr(cls, MultitonMeta.WEAKREF_MODE_FLAG)
 
         def finalize(ocls: type, uid: int) -> None:
             del getattr(ocls, MultitonMeta.INSTANCES_MAP_NAME)[uid]
@@ -94,6 +94,9 @@ class MultitonMeta(ABCMeta):
                 weakref.finalize(instance, finalize, cls, _id)
             return instance
         return instance() if _wr else instance
+
+
+TMultiton = TypeVar("TMultiton", bound="Multiton")
 
 
 class Multiton(metaclass=MultitonMeta):
@@ -120,7 +123,11 @@ class Multiton(metaclass=MultitonMeta):
     be called only once by instance (except in the case of being explicitly called).
     """
 
-    __slots__ = ()
+    # Here __slots__ avoids creating a __dict__ for subclass defining __slots__.
+    # When __slots__ are defined for a given type, weak reference
+    # support is disabled unless a '__weakref__' string is also
+    # present in the sequence of strings in the __slots__ declaration
+    __slots__ = ("__weakref__",)
 
     @classmethod
     @abstractmethod
@@ -140,7 +147,12 @@ class Multiton(metaclass=MultitonMeta):
         ...
 
     @classmethod
-    def get(cls, value: int, default: Any = None) -> Multiton | None:
-        """Return an instance of this class by its stored value."""
+    def _get(cls: type[TMultiton], value: int, default: Any = None) -> TMultiton | None:
+        """Return an instance of this class by its stored id value.
+
+        This method is intended to be called in a Multiton implementation
+        by a public get() method with a more useful signature than requiring
+        the internal and usually opaque id value.
+        """
         _i = getattr(cls, MultitonMeta.INSTANCES_MAP_NAME).get(value)
         return _i() or default
