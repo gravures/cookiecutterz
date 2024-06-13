@@ -18,8 +18,9 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from collections.abc import Iterator, Mapping
 from test.support.import_helper import import_fresh_module
-from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, Protocol, TypeVar, cast
 
 
 if TYPE_CHECKING:
@@ -134,3 +135,27 @@ class OrderableDict(_OrderedDict, dict[_KT, _VT]):
             )
             for v in self.__map.values()
         ])
+
+
+class FilteredDictView(Mapping[_KT, _VT]):
+    """Dictionary Filtered View."""
+
+    # __contains__, keys, items, values, get, __eq__, and __ne__
+    # are inherited from Mapping's mixin methods
+
+    __slots__ = ("_keys", "_source")
+
+    def __init__(self, source: Mapping[_KT, _VT], func: Callable[[_KT, _VT], bool]) -> None:
+        self._source: Mapping[_KT, _VT] = source
+        self._keys: set[_KT] = {k for k, v in source.items() if func(k, v)}
+
+    def __getitem__(self, key: _KT) -> _VT:
+        if key in self._keys:
+            return self._source[key]
+        raise KeyError(key)
+
+    def __len__(self) -> int:
+        return len(self._keys)
+
+    def __iter__(self) -> Iterator[_KT]:
+        yield from self._keys
