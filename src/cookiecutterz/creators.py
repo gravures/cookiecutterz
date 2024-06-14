@@ -25,27 +25,30 @@ from abc import ABCMeta, abstractmethod
 from typing import Any, TypeVar
 
 
-class SingletonMeta(type):
+TSingleton = TypeVar("TSingleton", bound="Singleton")
+
+
+class _SingletonMeta(type):
     """Singleton metaclass."""
 
     INSTANCE_REF_NAME = "__instance__"
 
     def __new__(
         cls, name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwargs: Any
-    ) -> SingletonMeta:
+    ) -> _SingletonMeta:
         """Type creation."""
-        namespace[SingletonMeta.INSTANCE_REF_NAME] = None
+        namespace[_SingletonMeta.INSTANCE_REF_NAME] = None
         return type.__new__(cls, name, bases, namespace, **kwargs)
 
-    def __call__(cls, *args: Any, **kwargs: Any) -> Any:
+    def __call__(cls: type[TSingleton], *args: Any, **kwargs: Any) -> TSingleton:
         """Called when instancing a type."""
-        if (instance := getattr(cls, SingletonMeta.INSTANCE_REF_NAME)) is None:
+        if (instance := getattr(cls, _SingletonMeta.INSTANCE_REF_NAME)) is None:
             instance = super().__call__(*args, **kwargs)
-            setattr(cls, SingletonMeta.INSTANCE_REF_NAME, instance)
+            setattr(cls, _SingletonMeta.INSTANCE_REF_NAME, instance)
         return instance
 
 
-class Singleton(metaclass=SingletonMeta):
+class Singleton(metaclass=_SingletonMeta):
     """Singleton base class.
 
     This Singleton implementation holds a strong reference to its
@@ -53,7 +56,7 @@ class Singleton(metaclass=SingletonMeta):
     maintain a reference to the instance to keep it alive.
 
     This way this maintains a global state during the life of the
-    prroramm (which could be seen as a major drawback).
+    program (which could be seen as a major drawback).
 
     The Singleton class ensure that the __init__ method is called only
     once on this instance (except in the case of being explicitly called again).
@@ -62,7 +65,7 @@ class Singleton(metaclass=SingletonMeta):
     __slots__ = ()
 
 
-class MultitonMeta(ABCMeta):
+class _MultitonMeta(ABCMeta):
     """Multiton metaclass."""
 
     ID_METH_NAME = "__id__"
@@ -71,21 +74,21 @@ class MultitonMeta(ABCMeta):
 
     def __new__(
         cls, name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwargs: Any
-    ) -> MultitonMeta:
+    ) -> _MultitonMeta:
         """Type creation."""
-        namespace[MultitonMeta.INSTANCES_MAP_NAME] = {}
-        namespace[MultitonMeta.WEAKREF_MODE_FLAG] = bool(kwargs.pop("weakref", True))
+        namespace[_MultitonMeta.INSTANCES_MAP_NAME] = {}
+        namespace[_MultitonMeta.WEAKREF_MODE_FLAG] = bool(kwargs.pop("weakref", True))
 
         return type.__new__(cls, name, bases, namespace, **kwargs)
 
-    def __call__(cls, *args: Any, **kwargs: Any) -> Any:
+    def __call__(cls: type[TMultiton], *args: Any, **kwargs: Any) -> TMultiton:
         """Called when instancing a type."""
-        _id = getattr(cls, MultitonMeta.ID_METH_NAME)(*args, **kwargs)
-        _is = getattr(cls, MultitonMeta.INSTANCES_MAP_NAME)
-        _wr = getattr(cls, MultitonMeta.WEAKREF_MODE_FLAG)
+        _id = getattr(cls, _MultitonMeta.ID_METH_NAME)(*args, **kwargs)
+        _is = getattr(cls, _MultitonMeta.INSTANCES_MAP_NAME)
+        _wr = getattr(cls, _MultitonMeta.WEAKREF_MODE_FLAG)
 
         def finalize(ocls: type, uid: int) -> None:
-            del getattr(ocls, MultitonMeta.INSTANCES_MAP_NAME)[uid]
+            del getattr(ocls, _MultitonMeta.INSTANCES_MAP_NAME)[uid]
 
         if not (instance := _is.get(_id)):
             instance = super().__call__(*args, **kwargs)
@@ -99,7 +102,7 @@ class MultitonMeta(ABCMeta):
 TMultiton = TypeVar("TMultiton", bound="Multiton")
 
 
-class Multiton(metaclass=MultitonMeta):
+class Multiton(metaclass=_MultitonMeta):
     """Multiton abstract base class.
 
     The Multiton is an extension of the singleton. It ensures that
@@ -154,5 +157,5 @@ class Multiton(metaclass=MultitonMeta):
         by a public get() method with a more useful signature than requiring
         the internal and usually opaque id value.
         """
-        _i = getattr(cls, MultitonMeta.INSTANCES_MAP_NAME).get(value)
+        _i = getattr(cls, _MultitonMeta.INSTANCES_MAP_NAME).get(value)
         return _i() or default
