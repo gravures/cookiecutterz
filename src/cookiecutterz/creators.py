@@ -59,7 +59,16 @@ class Singleton(metaclass=_SingletonMeta):
     program (which could be seen as a major drawback).
 
     The Singleton class ensure that the __init__ method is called only
-    once on this instance (except in the case of being explicitly called again).
+    once on its instance (except if being explicitly called again).
+
+    Major drawbacks:
+        - The Singleton class is not thread-safe.
+        - Subclassing a Singleton allows creating multiple instances of
+          the same base class.
+        - When creating a new instance you don't know if it's a fresh one.
+        - Testing a Singleton class is not trivial because of the former.
+
+    A simple python module could be a better candidate to manage a global state.
     """
 
     __slots__ = ()
@@ -70,14 +79,14 @@ class _MultitonMeta(ABCMeta):
 
     ID_METH_NAME = "__id__"
     INSTANCES_MAP_NAME = "__instances__"
-    WEAKREF_MODE_FLAG = "__multiton_weakref__"
+    WEAKREF_FLAG_NAME = "__multiton_weakref__"
 
     def __new__(
         cls, name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwargs: Any
     ) -> _MultitonMeta:
         """Type creation."""
         namespace[_MultitonMeta.INSTANCES_MAP_NAME] = {}
-        namespace[_MultitonMeta.WEAKREF_MODE_FLAG] = bool(kwargs.pop("weakref", True))
+        namespace[_MultitonMeta.WEAKREF_FLAG_NAME] = bool(kwargs.pop("weakref", True))
 
         return type.__new__(cls, name, bases, namespace, **kwargs)
 
@@ -85,7 +94,7 @@ class _MultitonMeta(ABCMeta):
         """Called when instancing a type."""
         _id = getattr(cls, _MultitonMeta.ID_METH_NAME)(*args, **kwargs)
         _is = getattr(cls, _MultitonMeta.INSTANCES_MAP_NAME)
-        _wr = getattr(cls, _MultitonMeta.WEAKREF_MODE_FLAG)
+        _wr = getattr(cls, _MultitonMeta.WEAKREF_FLAG_NAME)
 
         def finalize(ocls: type, uid: int) -> None:
             del getattr(ocls, _MultitonMeta.INSTANCES_MAP_NAME)[uid]
@@ -125,6 +134,13 @@ class Multiton(metaclass=_MultitonMeta):
     Like with the Singleton of this module, the __init__ method is ensure to
     be called only once by instance (except in the case of being explicitly called).
     """
+
+    # TODO: - Studies relationship with immutability
+    #       - do values that id are built on should be immutable
+    #       - does __id__ could return an hashable/immutable value intsead int?
+    #       - what about copy(instance)?
+    #       - what about peekable?
+    #       - does multiton implementation should be final?
 
     # Here __slots__ avoids creating a __dict__ for subclass defining __slots__.
     # When __slots__ are defined for a given type, weak reference
