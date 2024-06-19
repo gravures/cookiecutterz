@@ -34,35 +34,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(f"cookiecutter.{__name__}")
 
 
-def uncache(*excludes: str) -> None:
-    """Remove package modules from cache except excluded ones.
-
-    On next import they will be reloaded.
-    """
-    pkgs: list[str] = []
-    for mod in excludes:
-        pkg = mod.split(".", 1)[0]
-        pkgs.append(pkg)
-
-    to_uncache: list[str] = []
-    for mod in sys.modules:
-        if mod in excludes:
-            continue
-        if mod in pkgs:
-            to_uncache.append(mod)
-            continue
-        for pkg in pkgs:
-            if mod.startswith(f"{pkg}."):
-                to_uncache.append(mod)
-                break
-    for mod in to_uncache:
-        del sys.modules[mod]
-
-
 class Module:
     """Utility class for dynamic loading of python module."""
 
-    __slots__ = ("_is_pkg", "_name", "_pkg", "_spec")
+    __slots__ = ("_is_pkg", "_is_root", "_name", "_pkg", "_spec")
 
     def __init__(self, name: str, *, package: str = "", where: Path | None = None) -> None:
         abs_name = importlib.util.resolve_name(name, package)
@@ -70,6 +45,7 @@ class Module:
         self._spec: importlib.machinery.ModuleSpec = self._find_spec(abs_name, where)
         self._is_pkg: bool = self._spec.submodule_search_locations is not None
         self._pkg, _, self._name = abs_name.rpartition(".")
+        self._is_root: bool = self._is_pkg and not self._pkg
 
     @staticmethod
     def _find_spec(name: str, where: Path | None) -> importlib.machinery.ModuleSpec:
@@ -115,12 +91,17 @@ class Module:
     @property
     def root(self) -> str:
         """Returns the top package name this module belongs to."""
-        return self._pkg.split(".")[0]
+        return self._name if self._is_root else self._pkg.split(".")[0]
 
     @property
     def name(self) -> str:
         """Returns the name of this module without any prefixes."""
         return self._name
+
+    @property
+    def full_name(self) -> str:
+        """Returns the full name of this module."""
+        return f"{self._pkg}.{self.name}" if self._pkg else self.name
 
     @property
     def module(self) -> ModuleType | None:
@@ -132,6 +113,11 @@ class Module:
         """Returns True if this module is also a package."""
         return self._is_pkg
 
+    @property
+    def is_root(self) -> bool:
+        """Returns True if this module is a top package."""
+        return self._is_root
+
     def prefix_of(self, other: str) -> bool:
         """Returns True if self is a package and is a prefix of other name."""
         prefix = f"{self!s}."
@@ -142,7 +128,7 @@ class Module:
         return other.split(".")[0] == self.root if self.root else False
 
     def __str__(self) -> str:
-        return f"{self.pkg}.{self.name}" if self.pkg else self.name
+        return self.full_name
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self!s})"
@@ -179,15 +165,22 @@ class monkey:  # noqa: N801
         self._origin: Patchable = _NULL
         monkey._patches[str(self)] = self
 
-    @staticmethod
-    def _null_patch(*_a: Any, **_k: Any) -> Any:
-        raise NotImplementedError
+    def __call__(self, patch: Patch) -> Patch:
+        """Decorator method."""
+        self._patch = patch
+        self._mark_modules()
+        return patch
 
-    def _apply(self) -> None:
-        """Substitute target with patch."""
-        self._module.load()
-        self._origin = getattr(self._module.module, self._target)
-        setattr(self._module.module, self._target, self._patch)
+    def __str__(self) -> str:
+        return f"{self._module}.{self._target}"
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self!s})"
+
+    @classmethod
+    def patches(cls) -> list[str]:
+        """Returns a list of all registered patched targets name."""
+        return [str(k) for k in monkey._patches]
 
     @classmethod
     def apply_all(cls) -> None:
@@ -196,16 +189,6 @@ class monkey:  # noqa: N801
             if patch._origin is _NULL:
                 patch._apply()
         monkey._reload_modules()
-
-    @classmethod
-    def _reload_modules(cls) -> None:
-        """Reload all marked modules."""
-        while monkey._to_reload:
-            module = monkey._to_reload.pop()
-            if module in monkey._protected:
-                monkey._to_reload.clear()
-                raise RuntimeError
-            importlib.reload(sys.modules[module])
 
     @classmethod
     def target(cls, name: str) -> Patchable:
@@ -221,27 +204,41 @@ class monkey:  # noqa: N801
                 raise RuntimeError(msg)
             return patch._origin
 
-    def __call__(self, patch: Patch) -> Patch:
-        """Decorator method."""
-        # def wrapper(*args: Any, **kwargs: Any) -> Any:
-        #     return patch(*args, **kwargs)
-        self._patch = patch
+    @classmethod
+    def marks_modules(cls, *modules: str) -> None:
+        """Marks modules name needing an explicit reload."""
+        for mod in modules:
+            if mod in monkey._protected:
+                msg = f"{mod} belongs to protected module list, can't mark it"
+                raise ValueError(msg)
+            cls._to_reload.add(mod)
 
-        return patch
+    def _apply(self) -> None:
+        """Actually ubstitute target with the set patch."""
+        self._module.load()
+        self._origin = getattr(self._module.module, self._target)
+        setattr(self._module.module, self._target, self._patch)
 
-    def __str__(self) -> str:
-        return f"{self._module}.{self._target}"
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self!s})"
-
-    def __hash__(self) -> int:
-        return hash((self._module, self._target))
-
-    def __eq__(self, other: object) -> bool:
-        return isinstance(other, self.__class__) and hash(other) == hash(self)
+    def _mark_modules(self) -> None:
+        """Marks already loaded modules needing a reload."""
+        for mod_name in sys.modules:
+            if mod_name == self._module.full_name:
+                continue
+            if self._module.prefix_of(mod_name) or self._module.share_root(mod_name):
+                monkey._to_reload.add(mod_name)
 
     @classmethod
-    def patches(cls) -> list[str]:
-        """Returns a list of patched targets name."""
-        return [str(k) for k in monkey._patches]
+    def _reload_modules(cls) -> None:
+        """Reload all marked modules."""
+        while monkey._to_reload:
+            module = monkey._to_reload.pop()
+            if module in monkey._protected:
+                monkey._to_reload.clear()
+                msg = f"{module} belongs to protected module list, can't reload it"
+                raise RuntimeError(msg)
+            importlib.reload(sys.modules[module])
+
+    @staticmethod
+    def _null_patch(*_a: Any, **_k: Any) -> Any:
+        """A dummy function for the initial state of monkey patch."""
+        raise NotImplementedError
