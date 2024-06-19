@@ -26,6 +26,9 @@ from typing import TYPE_CHECKING, Any, Callable, Protocol, TypeVar, cast
 if TYPE_CHECKING:
     from types import ModuleType
 
+# TODO: make a c implementation of OrderableDict
+# TODO: expands docs of after and before method
+# TODO: make a generic function for loading a python module instead its c verrsion
 
 _VT = TypeVar("_VT")
 _KT = TypeVar("_KT")
