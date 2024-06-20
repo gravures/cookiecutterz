@@ -25,7 +25,7 @@ from cookiecutter.environment import ExtensionLoaderMixin
 from jinja2 import Environment, StrictUndefined
 
 from cookiecutterz.creators import Multiton
-from cookiecutterz.helpers import loads_module
+from cookiecutterz.importer import loads_module
 from cookiecutterz.main import LOG_LEVEL
 
 

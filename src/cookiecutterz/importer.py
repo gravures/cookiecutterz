@@ -33,6 +33,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(f"cookiecutter.{__name__}")
 
+_NULL: type[None] = type(None)  # an undefined value that is not None
+Patchable = Any
+Patch = Callable[..., Any]
+
+
+def loads_module(name: str, where: Path) -> ModuleType | None:
+    """Loads a python module or package from the Path where."""
+    mod = Module(name=name, where=where)
+    mod.load()
+    return mod.module
+
 
 class Module:
     """Utility class for dynamic loading of python module."""
@@ -138,11 +149,6 @@ class Module:
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, self.__class__) and hash(other) == hash(self)
-
-
-_NULL: type[None] = type(None)  # an undefined value that is not None
-Patchable = Any
-Patch = Callable[..., Any]
 
 
 @final
