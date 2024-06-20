@@ -39,6 +39,7 @@ ignore = [
   'PT013',   # Found incorrect import of pytest
   'SLF001',  # Private member accessed
   'PLC2701', # import-private-name
+  'PLW3201', # Bad or misspelled dunder method name
 ]
 
 [lint.per-file-ignores]

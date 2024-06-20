@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, cast, final
+from typing import TYPE_CHECKING, ClassVar, cast, final
 
 from cookiecutter.environment import ExtensionLoaderMixin
 from jinja2 import Environment, StrictUndefined
@@ -27,49 +27,51 @@ from jinja2 import Environment, StrictUndefined
 from cookiecutterz.creators import Multiton
 from cookiecutterz.helpers import loads_module
 from cookiecutterz.main import LOG_LEVEL
-from cookiecutterz.types import Context, RepoID, Unique
 
 
 if TYPE_CHECKING:
     from jinja2.ext import Extension
 
+    from cookiecutterz.types import Context, Repo, Template
+
 logger = logging.getLogger(f"cookiecutter.{__name__}")
 
 
 @final
-class SharedEnvironment(Multiton, Unique, ExtensionLoaderMixin, Environment, weakref=False):
+class SharedEnvironment(Multiton, ExtensionLoaderMixin, Environment, weakref=False):
     """Class replacement for cookiecutter.StrictEnvironment.
 
-    SharedEnvironment are cached across cookiecutter session.
+    SharedEnvironment are cached across a cookiecutter session.
     """
 
-    _cached_extensions: ClassVar[dict[RepoID, set[type[Extension]]]] = {}
+    _cached_extensions: ClassVar[dict[Repo, set[type[Extension]]]] = {}
     _global_template_dirs: ClassVar[set[str]] = set()
-    _tmp_id: ClassVar[RepoID]
+
+    def __init__(self, *, template: Template) -> None:
+        self.repo: Repo = template.repo
+        env_vars = template.context.cookiecutter.get("_jinja2_env_vars", {})
+        super().__init__(  # pyright: ignore[reportUnknownMemberType]
+            undefined=StrictUndefined,
+            context=template.context,
+            keep_trailing_newline=True,
+            **env_vars,
+        )
 
     @classmethod
-    def __id__(cls, *_args: Any, **kwargs: Any) -> int:  # noqa: PLW3201
+    def __id__(cls, template: Template) -> int:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Return the repository ID."""
-        if not (context := kwargs.get("context")):
-            msg = "Missing context named argument"
-            raise ValueError(msg)
-        cls._tmp_id = RepoID(Path(context["cookiecutter"]["_repo_dir"]))
-        return hash(cls._tmp_id)
+        return hash(template.repo)
 
     @classmethod
-    def get(cls, repo_id: RepoID) -> SharedEnvironment | None:
-        """Return the environment for the given repository ID."""
-        return super()._get(hash(repo_id))
-
-    def __init__(self, **kwargs: Any) -> None:
-        Unique.__init__(self, SharedEnvironment._tmp_id)
-        ExtensionLoaderMixin.__init__(self, undefined=StrictUndefined, **kwargs)  # pyright: ignore[reportUnknownMemberType]
+    def get(cls, repo: Repo) -> SharedEnvironment | None:
+        """Return the environment for the given Repo."""
+        return super()._get(hash(repo))
 
     def _read_extensions(self, context: Context) -> list[type[Extension]]:
         extensions = cast(list[str], super()._read_extensions(context))  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
         repo: Path = Path(context["cookiecutter"]["_repo_dir"])
         self._register(repo, extensions)
-        return list(SharedEnvironment._cached_extensions[self.repo_id])
+        return list(SharedEnvironment._cached_extensions[self.repo])
 
     def _register(self, repo: Path, extensions: list[str]) -> None:
         """Registers Jinja templates directory and extensions."""
@@ -78,11 +80,11 @@ class SharedEnvironment(Multiton, Unique, ExtensionLoaderMixin, Environment, wea
             self._global_template_dirs.add(str(tmp))
 
         # register extensions for each template
-        SharedEnvironment._cached_extensions[self.repo_id] = set()
+        SharedEnvironment._cached_extensions[self.repo] = set()
         for ext in extensions:
             _p = ext.split(".")
             if (mod := loads_module(_p[0], repo)) and (_ext := getattr(mod, _p[-1], None)):
-                SharedEnvironment._cached_extensions[self.repo_id].add(_ext)
+                SharedEnvironment._cached_extensions[self.repo].add(_ext)
         logger.log(
             LOG_LEVEL, "registered jinja extensions %s", SharedEnvironment._cached_extensions
         )

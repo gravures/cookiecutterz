@@ -26,15 +26,19 @@ from cookiecutter.exceptions import ContextDecodingException, CookiecutterExcept
 from cookiecutter.generate import generate_context
 from cookiecutter.repository import expand_abbreviations
 
-from cookiecutterz.creators import Multiton
-
 # from cookiecutter.repository import is_zip_file
 # from git import Repo
+from cookiecutterz.creators import Multiton
+from cookiecutterz.importer import monkey
 from cookiecutterz.mapping import FilteredDictView, OrderableDict
 
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
+
+    from cookiecutter.repository import determine_repo_dir
+else:
+    determine_repo_dir = monkey.target("cookiecutter.repository.determine_repo_dir")
 
 
 class CircularInheritanceException(CookiecutterException):
@@ -46,7 +50,7 @@ class CircularInheritanceException(CookiecutterException):
 
 
 @final
-class Url(Multiton, str):
+class Url(Multiton, str, weakref=True):
     """Cookiecutter repository Url."""
 
     SCHEMES: ClassVar[set[str]] = {"file", "ssh", "git", "https", "http"}
@@ -58,7 +62,7 @@ class Url(Multiton, str):
         return super().__new__(cls, value)
 
     @classmethod
-    def __id__(cls, *args: Any, **_: Any) -> int:  # noqa: PLW3201
+    def __id__(cls, *args: Any, **_: Any) -> int:
         return hash(args[0])
 
     def __init__(self, value: str, abbreviations: dict[str, str] | None = None) -> None:  # noqa: ARG002
@@ -84,52 +88,99 @@ class Url(Multiton, str):
         return f"{self.__class__.__name__}('{self}')"
 
 
-class RepoID:
-    """RepoID allow to uniqly identify a repo directory.
+@final
+class Repo(Multiton, weakref=True):
+    """Cookiecutter repository."""
 
-    We check against template Path stem instead of plain Path
-    because repo could be a temporary copy of the initial repo,
-    (see: run_pre_prompt_hook()).
+    __slots__ = ("_checkout", "_directory", "_location", "_url", "_working_location")
 
-    NOTE: this have the limation of not handling different
-          templates resolving to the same name.
-    """
+    def __init__(self, *, url: Url, directory: str) -> None:
+        self._url: Url = url
+        self._directory: str = directory
+        self._location: Path | None = None
+        self._working_location: Path | None = None
+        self._checkout: str | None = None
 
-    __slots__ = ("_id",)
+    @classmethod
+    def __id__(cls, *_args: Any, **kwargs: Any) -> int:
+        """Repo instances are id by their template name and directory.
 
-    def __init__(self, repo: Path) -> None:
-        self._id: str = repo.stem
-
-    def __str__(self) -> str:
-        return self._id
-
-    def __repr__(self) -> str:
-        return f"RepoID({self._id})"
+        NOTE: this have the limation of not handling different
+              templates resolving to the same name.
+        """
+        return hash((kwargs["url"].path.stem, kwargs["directory"]))
 
     def __hash__(self) -> int:
-        return hash(self._id)
+        return Repo.__id__(url=self.url, directory=self.directory)
 
     def __eq__(self, other: object) -> bool:
-        return isinstance(other, RepoID) and self._id == other._id
-
-
-class Unique:
-    """Protocol for classes that are related to a repo."""
-
-    __slots__ = ("_id",)
-
-    def __init__(self, repo_id: RepoID) -> None:
-        self._id = repo_id
+        return isinstance(other, Repo) and hash(self) == hash(other)
 
     @property
-    def repo_id(self) -> RepoID:
-        """Returns the Unique RepoID attached to self."""
-        return self._id
+    def url(self) -> Url:
+        """Url of this Repo."""
+        return self.url
 
-    @repo_id.setter
-    def repo_id(self, value: RepoID) -> None:
-        """Returns the Unique RepoID attached to self."""
-        self._id = value
+    @property
+    def directory(self) -> str:
+        """Directory within repo where cookiecutter.json lives."""
+        return self._directory
+
+    @property
+    def checkout(self) -> str | None:
+        """Branch, tag or commit ID checked out."""
+        return self._checkout
+
+    @property
+    def location(self) -> Path:
+        """The directory where this Repo was cloned.
+
+        Returns: Path to the initial directory or to a tmp
+                 directory if a pre_prompt_hook was called.
+
+        Raises: RuntimeError if this Repo is not yet cloned.
+        """
+        if self._location is None:
+            msg = f"{self!r} is not yet cloned, directory does not exists."
+            raise RuntimeError(msg)
+        return self._working_location or self._location
+
+    def clone(
+        self,
+        *,
+        location: Path,
+        checkout: str | None,
+        no_input: bool,
+        password: str | None,
+    ) -> tuple[str, bool]:
+        """Clone this repository to directory.
+
+        If the template refers to a repository URL, clone it.
+        If the template is a path to a local repository, use it.
+        """
+        self._checkout = checkout
+        _dir, cleanup = determine_repo_dir(
+            template=self.url,
+            abbreviations={},  # we already resolved abbreviations with Url()
+            clone_to_dir=location,
+            checkout=checkout,
+            no_input=no_input,
+            password=password,
+            directory=self.directory,
+        )
+        _dir = cast(str, _dir)
+        cleanup = cast(bool, cleanup)
+        self._location = Path(_dir)
+        return _dir, cleanup
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self._url},{self._directory})"
+
+    def __str__(self) -> str:
+        return self.__fspath__()
+
+    def __fspath__(self) -> str:
+        return str(self.location)
 
 
 class Context(OrderableDict[str, Any]):
@@ -252,3 +303,61 @@ class Context(OrderableDict[str, Any]):
 
     def __str__(self) -> str:
         return self.dump()
+
+
+class Template:
+    """Cookiecutter Template composed with a cloned Repo and a Context."""
+
+    __slots__ = ("_context", "_repo")
+
+    def __init__(self, *, repo: Repo) -> None:
+        self._repo: Repo = repo
+        self._context: Context = Context.generate(directory=repo.location)
+
+    @property
+    def repo(self) -> Repo:
+        """The repository associated to this template."""
+        return self._repo
+
+    @property
+    def context(self) -> Context:
+        """The Context attached to this Template."""
+        return self._context
+
+
+# class CruftState(Context):
+#     """A class to represent the state of a Cruft project."""
+
+#     FILE_NAME = ".cruft.json"
+
+#     def __init__(self, last_commit: bytes | None = None, *args: Any, **kwargs: Any) -> None:
+#         super().__init__(*args, **kwargs)
+#         if last_commit and self.commit is None:
+#             self.commit = last_commit
+#         self["skipped"] = []
+
+#     @property
+#     def commit(self) -> bytes | None:
+#         """The repo commit."""
+#         return self.get("commit")
+
+#     @commit.setter
+#     def commit(self, value: bytes) -> None:
+#         self["commit"] = value
+
+#     def is_uptodate(self, repo: Repo, latest_commit: bytes) -> bool:
+#         """Return False if the template needs an update.
+
+#         If the latest commit exactly matches the current commit,
+#         or if there have been no changes to the cookiecutter,
+#         or if the strict flag is off, we allow for newer
+#         commits to count as up to date.
+#         """
+#         return any(
+#             latest_commit == self.commit,
+#             not repo.index.diff(self.commit),
+#             (
+#                 repo.is_ancestor(repo.commit(latest_commit), repo.commit(current_commit))
+#                 and not strict
+#             ),
+#         )
