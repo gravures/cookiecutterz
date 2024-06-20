@@ -18,6 +18,8 @@
 from __future__ import annotations
 
 import json
+import shutil
+import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, cast, final
 from urllib.parse import urlparse
@@ -92,13 +94,13 @@ class Url(Multiton, str, weakref=True):
 class Repo(Multiton, weakref=True):
     """Cookiecutter repository."""
 
-    __slots__ = ("_checkout", "_directory", "_location", "_url", "_working_location")
+    __slots__ = ("_checkout", "_directory", "_location", "_url", "_workspace")
 
     def __init__(self, *, url: Url, directory: str) -> None:
         self._url: Url = url
         self._directory: str = directory
         self._location: Path | None = None
-        self._working_location: Path | None = None
+        self._workspace: Path | None = None
         self._checkout: str | None = None
 
     @classmethod
@@ -115,6 +117,15 @@ class Repo(Multiton, weakref=True):
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Repo) and hash(self) == hash(other)
+
+    @classmethod
+    def get(cls, location: Path) -> Repo | None:
+        """Returns a Repo instance by its cloned location on disk."""
+        for repo in cls.__instances__.values():
+            repo = cast(Repo, repo)
+            if repo.location == location:
+                return repo
+        return None
 
     @property
     def url(self) -> Url:
@@ -133,17 +144,45 @@ class Repo(Multiton, weakref=True):
 
     @property
     def location(self) -> Path:
-        """The directory where this Repo was cloned.
-
-        Returns: Path to the initial directory or to a tmp
-                 directory if a pre_prompt_hook was called.
+        """The Path where this cloned Repo lives.
 
         Raises: RuntimeError if this Repo is not yet cloned.
         """
         if self._location is None:
             msg = f"{self!r} is not yet cloned, directory does not exists."
             raise RuntimeError(msg)
-        return self._working_location or self._location
+        return self._location
+
+    @property
+    def workspace(self) -> Path:
+        """Returns the directory used to effectively do template expansion.
+
+        Returns: Path to the initial repo location or to a temporary
+                 directory if create_tmp_repo_dir was called for this repo
+                 (eg: if a pre_prompt_hook was called).
+
+        Raises: RuntimeError if this Repo is not yet cloned.
+        """
+        return self._workspace or self.location
+
+    def clone_workspace(self) -> None:
+        """Create a temporary dir with a copy of the contents of location.
+
+        Excludes some problematics file patterns from the copy.
+        """
+        base_dir = tempfile.mkdtemp(prefix="cookiecutter")
+        new_dir = Path(base_dir) / self.location.name
+        shutil.copytree(
+            self.location,
+            new_dir,
+            ignore=shutil.ignore_patterns(
+                "__pycache__",
+                "*.pyc",
+                "venv",
+                ".venv",
+            ),
+        )
+        self._workspace = new_dir
 
     def clone(
         self,

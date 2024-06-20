@@ -22,76 +22,45 @@ import logging
 from pathlib import Path
 from typing import Any, cast, final
 
-from cookiecutter import config, main, repository
-from cookiecutter.utils import work_in
+from cookiecutter import main
 from jinja2 import FileSystemLoader
 
 from cookiecutterz.creators import Singleton
-from cookiecutterz.helpers import create_tmp_repo_dir
 from cookiecutterz.jenvironment import SharedEnvironment
 from cookiecutterz.main import LOG_LEVEL
 from cookiecutterz.mapping import OrderableDict
-from cookiecutterz.types import CircularInheritanceException, Context, RepoID, Unique, Url
+from cookiecutterz.types import CircularInheritanceException, Context, Repo, Template, Url
 
 
 logger = logging.getLogger(f"cookiecutter.{__name__}")
-
-
-# TODO: handle the complete set of options to expand
-#       a cookiecutter template (eg: directory, ...)
 
 
 def _log_context(context: dict[str, Any]) -> None:
     logger.log(LOG_LEVEL, "\n%s", json.dumps(context, indent=2))
 
 
-class Template(Unique):
-    """Template data."""
+user_config: dict[str, Any] = {}
 
-    __slots__ = ("_context", "_repo", "_url")
 
-    def __init__(self, *, repo: Path, url: Url | None = None) -> None:
-        self._repo: Path = repo
-        self._url: Url = url or Url("Undefined")
-        self._context: Context = Context.generate(directory=repo)
-        super().__init__(RepoID(self._repo))
+def template_from_url(url: str) -> Template:
+    """Factory function returning a Template from a remote repo or a local directory.
 
-    @property
-    def repo(self) -> Path:  # noqa: D102
-        return self._repo
+    The repo for the retuned Template is cloned locally from
+    the url or use as it is if already a local directory.
+    """
+    # TODO: handle template directory
+    #       handle checkout
+    #       handle password
 
-    @repo.setter
-    def repo(self, value: Path) -> None:
-        self._repo = value
-        if RepoID(self._repo) != self.repo_id:
-            msg = f"new value {value} does not meet actual template name {value.stem}"
-            raise ValueError(msg)
-
-    @property
-    def url(self) -> Url:  # noqa: D102
-        return self._url
-
-    @property
-    def context(self) -> Context:  # noqa: D102
-        return self._context
-
-    @staticmethod
-    def from_url(url: Url) -> Template:
-        """Return a Template from a remote repo or a local directory.
-
-        The repo for the retuned Template is cloned locally from
-        the url or use as it is if already a local directory.
-        """
-        user_config: dict[str, Any] = config.get_user_config()  # pyright: ignore [reportUnknownMemberType]
-        repo, _ = repository.determine_repo_dir(  # pyright: ignore[reportUnknownMemberType]
-            template=url,
-            abbreviations=user_config["abbreviations"],
-            clone_to_dir=user_config["cookiecutters_dir"],
-            checkout=None,
-            no_input=True,
-        )
-        repo = Path(cast(str, repo))
-        return Template(repo=repo, url=url)
+    _url = Url(url, abbreviations=user_config.get("abbreviations"))
+    repo = Repo(url=_url, directory="")
+    repo.clone(
+        location=Path(user_config["cookiecutters_dir"]),
+        checkout=None,
+        no_input=True,
+        password=None,
+    )
+    return Template(repo=repo)
 
 
 @final
@@ -101,35 +70,29 @@ class Master(Singleton):
     __slots__ = (
         "__tro__",
         "_bases_installed",
-        "_cloned",
         "_inspected",
         "current",
-        "cwd",
         "stage",
         "template",
     )
 
-    def __init__(self, *, repo: Path | None = None, work_dir: Path | None = None) -> None:
+    def __init__(self, *, repo: Repo | None = None) -> None:
         if repo is None:
             msg = "First call to Master() should supply a repo parameter"
             raise ValueError(msg)
 
         self._bases_installed: bool = False
         self._inspected: bool = False
-        self.__tro__: OrderableDict[RepoID, Template] = OrderableDict()
-        self._cloned: bool = bool(work_dir and work_dir != repo)
-        self.cwd: Path = Path.cwd()
-        self.template = Template(repo=work_dir or repo)
-        self.current: RepoID = self.template.repo_id
+        self.__tro__: OrderableDict[Repo, Template] = OrderableDict()
+        self.template = Template(repo=repo)
+        self.current: Repo = self.template.repo
         self.stage: str = "init"
 
         self._prepare()
 
     def get_current_template(self) -> Template:
         """Return current template."""
-        return (
-            self.template if self.current == self.template.repo_id else self.__tro__[self.current]
-        )
+        return self.template if self.current == self.template.repo else self.__tro__[self.current]
 
     def _prepare(self) -> None:  # sourcery skip: extract-method
         """Inspect and prepare the master template.
@@ -142,15 +105,17 @@ class Master(Singleton):
             return
 
         if self.template.context.cookiecutter.get("_bases"):
-            self.template.repo = (
-                self.template.repo if self._cloned else create_tmp_repo_dir(self.template.repo)
-            )
+            # we clone the repo location so we can safely
+            # generate a new cookiecutter.json
+            if self.template.repo.location == self.template.repo.workspace:
+                self.template.repo.clone_workspace()
+
             self.template.context.cookiecutter.setdefault("_copy_without_render", [])
             self.template.context.cookiecutter.setdefault("__prompts__", {})
             self._inspect_template(self.template)
 
             # export merged cookiecutter mapping to json in place of original
-            self.template.context.export(directory=self.template.repo)
+            self.template.context.export(directory=self.template.repo.location)
             _log_context(self.template.context.cookiecutter)
 
         self._inspected = True
@@ -158,7 +123,7 @@ class Master(Singleton):
 
     def _inspect_template(self, template: Template) -> None:
         """Inspect template and populate base templates."""
-        if not (bases := cast(list[Url], template.context.cookiecutter.get("_bases"))):
+        if not (bases := cast(list[str], template.context.cookiecutter.get("_bases"))):
             return
 
         # template could have multiples inheritance
@@ -171,7 +136,7 @@ class Master(Singleton):
             self._inspect_template(base)
 
             # Assure proper Templates Resolution Order
-            self.__tro__.move_to_end(base.repo_id, last=True)
+            self.__tro__.move_to_end(base.repo, last=True)
 
             # Forward input fields if not defined in master template
             _curr: str = cc_master.first
@@ -194,26 +159,24 @@ class Master(Singleton):
                 )
             )
 
-    def _register_template(self, url: Url) -> Template:
+    def _register_template(self, url: str) -> Template:
         """Register a template as a base template..
 
         Avoid circular inheritance in a very restrictive way.
         """
-        tmpl = Template.from_url(url)
-        if tmpl.repo_id == self.template.repo_id or (
-            self.__tro__ and tmpl.repo_id in self.__tro__
-        ):
+        tmpl = template_from_url(url)
+        if tmpl.repo == self.template.repo or (self.__tro__ and tmpl.repo in self.__tro__):
             raise CircularInheritanceException
-        self.__tro__[tmpl.repo_id] = tmpl
+        self.__tro__[tmpl.repo] = tmpl
         return tmpl
 
     def update_jinja_environment(self) -> None:
         """Update the jinja environment with inherited extensions and templates."""
-        if not (m_env := SharedEnvironment.get(self.template.repo_id)):
+        if not (m_env := SharedEnvironment.get(self.template.repo)):
             return
 
         for _id, exts in SharedEnvironment._cached_extensions.items():
-            if _id != self.template.repo_id:
+            if _id != self.template.repo:
                 for e in exts:
                     m_env.add_extension(e)
         if SharedEnvironment._global_template_dirs:
@@ -227,7 +190,7 @@ class Master(Singleton):
             LOG_LEVEL,
             "<%s>: Updating the jinja environment(%s) with %s and %s",
             self.stage,
-            m_env.repo_id,
+            m_env.repo,
             SharedEnvironment._cached_extensions,
             SharedEnvironment._global_template_dirs,
         )
@@ -242,11 +205,11 @@ class Master(Singleton):
         """
         self.stage = "install"
 
-        if self.current == self.template.repo_id:
+        if self.current == self.template.repo:
             logger.log(LOG_LEVEL, "will %s template %s", self.stage, self.current)
 
         # Safe guard preventing recursive expansion of base template
-        if (not self.__tro__) or self.current != self.template.repo_id:
+        if (not self.__tro__) or self.current != self.template.repo:
             return
 
         # Get the user input from the master template provided by cookiecutter
@@ -255,19 +218,19 @@ class Master(Singleton):
 
         # Expands base templates using our Template Resolution Order
         for base_t in self.__tro__.values():
+            base_t = cast(Template, base_t)
             # expands overwriting files if necessary
-            self.current = base_t.repo_id
+            self.current = base_t.repo
             logger.log(LOG_LEVEL, "will %s base template %s", self.stage, self.current)
 
-            with work_in(self.cwd):
-                main.cookiecutter(  # pyright: ignore[reportUnknownMemberType]
-                    template=str(base_t.repo),
-                    no_input=True,
-                    extra_context=public_keys,
-                    output_dir=str(Path(project_dir).parent),
-                    accept_hooks=True,
-                    overwrite_if_exists=True,
-                    skip_if_file_exists=False,
-                )
+            main.cookiecutter(  # pyright: ignore[reportUnknownMemberType]
+                template=str(base_t.repo.url),
+                no_input=True,
+                extra_context=public_keys,
+                output_dir=str(Path(project_dir).parent),
+                accept_hooks=True,
+                overwrite_if_exists=True,
+                skip_if_file_exists=False,
+            )
         self._bases_installed = True
         self.update_jinja_environment()

@@ -17,59 +17,51 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from cookiecutter import hooks, prompt, utils
-from cookiecutter.hooks import run_hook, run_pre_prompt_hook
-
+import cookiecutterz.inheritance
 from cookiecutterz._version import __version__
+from cookiecutterz.importer import monkey
 from cookiecutterz.inheritance import Master
 from cookiecutterz.jenvironment import SharedEnvironment
-from cookiecutterz.types import Context
+from cookiecutterz.types import Context, Repo, Url
 
 
 if TYPE_CHECKING:
-    import os
-
     import jinja2
 
 
 __all__ = ["__version__"]
 
 
-def uncache(exclude: list[str]) -> None:
-    """Remove package modules from cache except excluded ones."""
-    pkgs: list[str] = []
-    for mod in exclude:
-        pkg = mod.split(".", 1)[0]
-        pkgs.append(pkg)
-
-    to_uncache: list[str] = []
-    for mod in sys.modules:
-        if mod in exclude:
-            continue
-        if mod in pkgs:
-            to_uncache.append(mod)
-            continue
-        for pkg in pkgs:
-            if mod.startswith(f"{pkg}."):
-                to_uncache.append(mod)
-                break
-    for mod in to_uncache:
-        del sys.modules[mod]
-
-
 # MONKEY PATCHING COOKIECUTTER
-def run_pre_prompt_hook_patched(repo_dir: os.PathLike[str]) -> Path:
+@monkey(module="cookiecutter.repository", target="determine_repo_dir")
+def determine_repo_dir_patch(  # noqa: PLR0917
+    template: str,
+    abbreviations: dict[str, str],
+    clone_to_dir: Path | str,
+    checkout: str | None,
+    no_input: bool,
+    password: str | None = None,
+    directory: str | None = None,
+) -> tuple[str, bool]:
     """Main entry point in template generation process."""
-    work_dir: Path = run_pre_prompt_hook(repo_dir)
-    master = Master(repo=Path(repo_dir), work_dir=Path(work_dir))
-    return master.template.repo
+    repo = Repo(
+        url=Url(template, abbreviations=abbreviations),
+        directory=directory or "",
+    )
+    Master(repo=repo)
+    return repo.clone(
+        location=Path(clone_to_dir),
+        checkout=checkout,
+        no_input=no_input,
+        password=password,
+    )
 
 
-def run_hook_patched(
+@monkey(module="cookiecutter.hooks", target="run_hook")
+def run_hook_patch(
     hook_name: str,
     project_dir: str,
     context: dict[str, Any],
@@ -78,33 +70,48 @@ def run_hook_patched(
 
     Those will happened inside te generate_files() cookicutter function.
     """
+    origin = monkey.target("cookiecutter.hooks.run_hook")
     if hook_name == "post_gen_project":
-        run_hook(hook_name, project_dir, context)
+        origin(hook_name, project_dir, context)
     elif hook_name == "pre_gen_project":
-        run_hook(hook_name, project_dir, context)
+        origin(hook_name, project_dir, context)
         master = Master()
         master.install_bases(project_dir, Context(context=context))
 
 
-def create_env_with_context_patched(context: dict[str, Any]) -> jinja2.Environment:
+@monkey(module="cookiecutter.utils", target="create_tmp_repo_dir")
+def create_tmp_repo_dir_patch(repo_dir: Path | str) -> Path:
+    """Create a temporary dir with a copy of the contents of repo_dir.
+
+    Raises: RuntimeError if a corresponding Repo instance cannot be found.
+    """
+    if not (repo := Repo.get(location=Path(repo_dir))):
+        raise RuntimeError
+    repo.clone_workspace()
+    return repo.workspace
+
+
+@monkey(module="cookiecutter.config", target="get_user_config")
+def get_user_config_patch(
+    config_file: str | None = None,
+    default_config: bool | dict[str, Any] = False,
+) -> dict[str, Any]:
+    """Register user config globally."""
+    origin = monkey.target("cookiecutter.config.get_user_config")
+    cookiecutterz.inheritance.user_config = origin(
+        config_file=config_file, default_config=default_config
+    )
+    return cookiecutterz.inheritance.user_config
+
+
+@monkey(module="cookiecutter.utils", target="create_env_with_context")
+def create_env_with_template(**_kwargs: Any) -> jinja2.Environment:
     """Patch for updating jinja environment with inherited templates.
 
-    Create a jinja environment using the provided context.
+    Create a jinja environment using the provided current template.
     """
     master = Master()
-    env_vars = context.get("cookiecutter", {}).get("_jinja2_env_vars", {})
-    context["cookiecutter"].setdefault("_repo_dir", str(master.get_current_template().repo))
-    return SharedEnvironment(
-        context=context,
-        keep_trailing_newline=True,
-        **env_vars,
-    )
+    return SharedEnvironment(template=master.get_current_template())
 
 
-# Applying patched functions
-hooks.run_pre_prompt_hook = run_pre_prompt_hook_patched
-hooks.run_hook = run_hook_patched
-prompt.create_env_with_context = create_env_with_context_patched  # pyright: ignore[reportAttributeAccessIssue]
-hooks.create_env_with_context = create_env_with_context_patched  # pyright: ignore[reportAttributeAccessIssue]
-utils.create_env_with_context = create_env_with_context_patched
-uncache(["cookiecutter.hooks", "cookiecutter.utils", "cookiecutter.prompt"])
+monkey.apply_all()

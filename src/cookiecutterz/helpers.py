@@ -18,42 +18,18 @@
 from __future__ import annotations
 
 import logging
-import shutil
 import sys
-import tempfile
 from importlib.util import module_from_spec, spec_from_file_location
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cookiecutterz.main import LOG_LEVEL
 
 
 if TYPE_CHECKING:
-    import os
+    from pathlib import Path
     from types import ModuleType
 
 logger = logging.getLogger(f"cookiecutter.{__name__}")
-
-
-# TODO: report a bug to cooikecutter team
-#       copy hidden dir like .venv and fails
-def create_tmp_repo_dir(repo_dir: os.PathLike[str]) -> Path:
-    """Create a temporary dir with a copy of the contents of repo_dir."""
-    repo_dir = Path(repo_dir).resolve()
-    base_dir = tempfile.mkdtemp(prefix="cookiecutter")
-    new_dir = f"{base_dir}/{repo_dir.name}"
-    logger.log(LOG_LEVEL, "Copying repo_dir from %s to %s", repo_dir, new_dir)
-    shutil.copytree(
-        repo_dir,
-        new_dir,
-        ignore=shutil.ignore_patterns(
-            "__pycache__",
-            "*.pyc",
-            "venv",
-            ".venv",
-        ),
-    )
-    return Path(new_dir)
 
 
 def loads_module(name: str, where: Path) -> ModuleType | None:

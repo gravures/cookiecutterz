@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import weakref
 from abc import ABCMeta, abstractmethod
-from typing import Any, TypeVar
+from typing import Any, ClassVar, TypeVar
 
 
 TSingleton = TypeVar("TSingleton", bound="Singleton")
@@ -146,11 +146,14 @@ class Multiton(metaclass=_MultitonMeta):
     # When __slots__ are defined for a given type, weak reference
     # support is disabled unless a '__weakref__' string is also
     # present in the sequence of strings in the __slots__ declaration
+
+    __instances__: ClassVar[dict[int, Multiton]]
+
     __slots__ = ("__weakref__",)
 
     @classmethod
     @abstractmethod
-    def __id__(cls, *args: Any, **kwargs: Any) -> int:  # noqa: PLW3201
+    def __id__(cls, *args: Any, **kwargs: Any) -> int:
         """Returns an id for an incoming Multiton instance.
 
         This class method is called before actual instance creation
