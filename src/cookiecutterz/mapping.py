@@ -45,6 +45,9 @@ class _Link(Protocol[_KT]):
         self.prev: _Link[_KT]
 
 
+# FIXME: OrderableDict.values() iters on undefined type (Any)
+
+
 class OrderableDict(_OrderedDict, dict[_KT, _VT]):
     """RordeableDict is a more capable OrderedDict."""
 
